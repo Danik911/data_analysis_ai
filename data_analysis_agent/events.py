@@ -10,6 +10,11 @@ class DataAnalysisEvent(Event):
     prepared_data_description: str
     original_path: str
 
+class ModificationRequestEvent(Event):
+    """Carries the user-approved modification description."""
+    user_approved_description: str
+    original_path: str
+
 class ModificationCompleteEvent(Event):
     original_path: str
     modification_summary: str | None = None 
