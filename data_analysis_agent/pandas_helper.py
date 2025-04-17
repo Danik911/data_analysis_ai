@@ -3,6 +3,8 @@ import pandas as pd
 import os
 import traceback
 import re
+import matplotlib.pyplot as plt
+import seaborn as sns
 from llama_index.experimental.query_engine import PandasQueryEngine
 
 class PandasHelper:
@@ -140,3 +142,84 @@ class PandasHelper:
     def get_final_dataframe(self) -> pd.DataFrame:
         """Returns the final state of the DataFrame managed by the helper."""
         return self._current_df
+    
+    async def generate_plots(self, output_dir: str = "plots") -> list[str]:
+        """
+        Generates standard plots (histogram, countplot, scatterplot, boxplot)
+        for the current DataFrame ('Time', 'Mode', 'Distance') and saves them
+        to the specified directory. Returns a list of saved file paths.
+
+        Args:
+            output_dir (str): The directory to save the plots in. Defaults to 'plots'.
+        """
+        plot_paths = []
+        df = self._current_df # Use the helper's current dataframe
+
+        if df is None:
+            return ["Error: DataFrame not available in helper."]
+
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            sns.set_theme(style="whitegrid")
+            plot_context = "Plotting context active" # Placeholder for actual context management if needed
+
+            # 1. Histogram of Commute Times
+            plt.figure(figsize=(10, 6))
+            sns.histplot(df['Time'], kde=True, bins=15)
+            plt.title('Distribution of Commute Times')
+            plt.xlabel('Time (minutes)')
+            plt.ylabel('Frequency')
+            hist_path = os.path.join(output_dir, "time_histogram.png")
+            plt.savefig(hist_path)
+            plt.close() # Close plot to free memory
+            plot_paths.append(hist_path)
+            print(f"Saved plot: {hist_path}")
+
+            # 2. Bar Chart of Commute Modes
+            plt.figure(figsize=(8, 5))
+            sns.countplot(data=df, x='Mode', order=df['Mode'].value_counts().index)
+            plt.title('Count of Commute Modes')
+            plt.xlabel('Mode of Transport')
+            plt.ylabel('Count')
+            count_path = os.path.join(output_dir, "mode_countplot.png")
+            plt.savefig(count_path)
+            plt.close()
+            plot_paths.append(count_path)
+            print(f"Saved plot: {count_path}")
+
+            # 3. Scatter Plot of Distance vs. Time
+            plt.figure(figsize=(10, 6))
+            sns.scatterplot(data=df, x='Distance', y='Time', hue='Mode')
+            plt.title('Commute Distance vs. Time by Mode')
+            plt.xlabel('Distance (km)')
+            plt.ylabel('Time (minutes)')
+            plt.legend(title='Mode')
+            scatter_path = os.path.join(output_dir, "distance_time_scatter.png")
+            plt.savefig(scatter_path)
+            plt.close()
+            plot_paths.append(scatter_path)
+            print(f"Saved plot: {scatter_path}")
+
+            # 4. Box Plot of Time by Mode
+            plt.figure(figsize=(10, 6))
+            sns.boxplot(data=df, x='Mode', y='Time')
+            plt.title('Commute Time Distribution by Mode')
+            plt.xlabel('Mode of Transport')
+            plt.ylabel('Time (minutes)')
+            box_path = os.path.join(output_dir, "time_mode_boxplot.png")
+            plt.savefig(box_path)
+            plt.close()
+            plot_paths.append(box_path)
+            print(f"Saved plot: {box_path}")
+
+            return plot_paths
+
+        except Exception as e:
+            error_msg = f"Error generating plots: {e}\n{traceback.format_exc()}"
+            print(error_msg)
+            # Ensure plot is closed in case of error during saving
+            plt.close()
+            return [error_msg]
+        finally:
+            # Reset matplotlib state if necessary, or manage context
+            plt.rcdefaults() # Example reset, might need adjustment

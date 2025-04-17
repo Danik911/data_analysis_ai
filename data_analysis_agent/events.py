@@ -33,3 +33,8 @@ class CleaningInputRequiredEvent(Event):
 class CleaningResponseEvent(Event):
     """Event carrying the user's cleaning decisions."""
     user_choices: dict
+
+class VisualizationRequestEvent(Event):
+    """Event indicating that data visualization is requested."""
+    modified_data_path: str 
+    report: str             
