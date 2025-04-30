@@ -1,0 +1,46 @@
+{
+  "dataset_info": {
+    "total_rows": 281,
+    "total_columns": 4,
+    "column_names": [
+      "Case",
+      "Mode",
+      "Distance",
+      "Time"
+    ],
+    "quality_score": 94.48398576512456
+  },
+  "issue_summary": {
+    "total_rows": 281,
+    "total_columns": 4,
+    "missing_value_count": 3,
+    "duplicate_row_count": 0,
+    "outlier_count": 18,
+    "impossible_value_count": 2,
+    "duplicate_case_count": 2,
+    "invalid_mode_count": 6
+  },
+  "type_verification": {
+    "Case": {
+      "has_issues": false,
+      "current_type": "int64"
+    },
+    "Mode": {
+      "has_issues": false,
+      "current_type": "object"
+    },
+    "Distance": {
+      "has_issues": false,
+      "current_type": "float64"
+    },
+    "Time": {
+      "has_issues": false,
+      "current_type": "float64"
+    }
+  },
+  "missing_values": {
+    "column_details": {
+      "Case": {
+        "count": 0,
+        "percentage": 0.0,
+        "is_significant": 

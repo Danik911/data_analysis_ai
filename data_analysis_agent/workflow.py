@@ -10,6 +10,7 @@ from llama_index.core.tools import FunctionTool
 from pandas_helper import PandasHelper
 from events import *
 from agents import create_agents, llm
+from data_quality import DataQualityAssessment, DataCleaner, assess_data_quality, clean_data
 
 class DataAnalysisFlow(Workflow):
     
@@ -30,6 +31,35 @@ class DataAnalysisFlow(Workflow):
             print(f"Successfully loaded {ev.dataset_path} and created PandasQueryEngine.")
 
             self.data_prep_agent, self.data_analysis_agent = create_agents()
+
+            # --- Perform Enhanced Data Quality Assessment ---
+            print("Performing comprehensive data quality assessment...")
+            assessment_report = assess_data_quality(df, save_report=True, 
+                                      report_path='reports/data_quality_report.json')
+            
+            await ctx.set("assessment_report", assessment_report)
+            print(f"Data quality assessment completed and stored in context with quality score: {assessment_report['dataset_info']['quality_score']}")
+
+            # --- Format Quality Assessment Summary for Agent ---
+            issue_summary = assessment_report['issue_summary']
+            recommendations = assessment_report['recommendations']
+            
+            quality_summary = (
+                f"Data Quality Assessment Summary:\n"
+                f"- Total rows: {issue_summary['total_rows']}, Total columns: {issue_summary['total_columns']}\n"
+                f"- Missing values: {issue_summary['missing_value_count']}\n"
+                f"- Duplicate rows: {issue_summary['duplicate_row_count']}\n"
+                f"- Outliers detected: {issue_summary['outlier_count']}\n"
+                f"- Impossible values: {issue_summary['impossible_value_count']}\n"
+                f"- Quality score: {assessment_report['dataset_info']['quality_score']}/100\n\n"
+                f"Recommendations:\n"
+            )
+            
+            for category, recs in recommendations.items():
+                if recs:
+                    quality_summary += f"- {category.replace('_', ' ').title()}:\n"
+                    for rec in recs:
+                        quality_summary += f"  * {rec}\n"
 
             # --- Get initial stats for the next step ---
             initial_info_str = "Could not retrieve initial stats."
@@ -55,10 +85,11 @@ class DataAnalysisFlow(Workflow):
                 await ctx.set("stats_summary", initial_info_str) 
                 await ctx.set("column_info", column_info_dict) 
             
-
+            # Combine quality assessment with basic stats
+            combined_summary = f"{quality_summary}\n\nAdditional Statistics:\n{initial_info_str}"
             
             return InitialAssessmentEvent( 
-                stats_summary=initial_info_str,
+                stats_summary=combined_summary,
                 column_info=column_info_dict,
                 original_path=ev.dataset_path,
             )
@@ -70,20 +101,20 @@ class DataAnalysisFlow(Workflow):
         
     @step
     async def data_preparation(self, ctx: Context, ev: InitialAssessmentEvent) -> DataAnalysisEvent: 
-        """Use the data prep agent to suggest cleaning/preparation based on schema."""
+        """Use the data prep agent to suggest cleaning/preparation based on schema and quality assessment."""
 
-
-        initial_info = ev.stats_summary # Get stats from the event
+        initial_info = ev.stats_summary # Get enhanced stats and quality assessment from the event
         column_info = ev.column_info
+        assessment_report = await ctx.get("assessment_report", None)
 
+        # Enhanced prompt with quality assessment insights
         prep_prompt = (
-            f"The dataset (from {ev.original_path}) has the following shape and summary statistics:\\n{initial_info}\\nColumn Details:\\n{column_info}\\n\\n"
-            f"Based *only* on these statistics, describe the necessary data preparation steps. "
-            f"Specifically mention potential issues like outliers (e.g., in 'Distance' max value), missing values (e.g., count mismatch in 'Time'), "
-            f"and data quality issues in categorical columns (e.g., unique count vs expected for 'Mode', potential typos like 'Bas', 'Cra', 'Walt'). "
-            f"Suggest specific actions like imputation for 'Time', outlier investigation/handling for 'Distance', and checking unique values/correcting typos in 'Mode'. "
-            f"Focus on describing *what* needs to be done and *why* based *strictly* on the provided stats. **Do NOT suggest normalization or scaling steps.** If no issues are apparent from the stats, state that clearly. ALWAYS provide a description."
-            )
+            f"The dataset (from {ev.original_path}) has been analyzed with our enhanced data quality assessment tool. Here's the comprehensive summary:\n\n{initial_info}\n\n"
+            f"Based on these statistics and quality assessment, describe the necessary data preparation steps. "
+            f"Pay special attention to the recommendations from our data quality assessment tool, which has already identified issues using Tukey's method for outliers, systematic data type verification, and uniqueness verification. "
+            f"For each issue category (missing values, outliers, duplicates, impossible values, data types), suggest specific actions with statistical justification. "
+            f"Focus on describing *what* needs to be done and *why* based on the provided assessment and stats. If the assessment shows a high quality score with minimal issues, acknowledge that minimal cleaning is needed."
+        )
         result = self.data_prep_agent.chat(prep_prompt)
 
         prepared_data_description = None
@@ -98,7 +129,7 @@ class DataAnalysisFlow(Workflow):
             print(f"Warning: Agent response does not have expected 'response' attribute. Full result: {result}")
 
 
-        print(f"--- Prep Agent Description Output ---\\n{prepared_data_description}\\n------------------------------------")
+        print(f"--- Prep Agent Description Output ---\n{prepared_data_description}\n------------------------------------")
 
         # Store the *agent's suggested* description (before human input)
         await ctx.set("agent_prepared_data_description", prepared_data_description)
@@ -109,7 +140,6 @@ class DataAnalysisFlow(Workflow):
             original_path=ev.original_path
         )
 
-    
     @step
     async def human_consultation(self, ctx: Context, ev: DataAnalysisEvent) -> ModificationRequestEvent: 
         """Analyzes initial assessment, asks user for cleaning decisions using numbered options.""" 
@@ -216,60 +246,72 @@ class DataAnalysisFlow(Workflow):
 
 
     @step
-    async def data_modification(self, ctx: Context, ev: ModificationRequestEvent) -> ModificationCompleteEvent: # Changed input event type
-        """Applies the data modifications using a dedicated agent based on user input."""
-        print("--- Running Data Modification Step ---")
+    async def data_modification(self, ctx: Context, ev: ModificationRequestEvent) -> ModificationCompleteEvent:
+        """Applies the data modifications using the DataCleaner class based on user input."""
+        print("--- Running Enhanced Data Modification Step ---")
         df: pd.DataFrame = await ctx.get("dataframe")
-        query_engine: PandasQueryEngine = await ctx.get("query_engine")
+        assessment_report = await ctx.get("assessment_report")
         original_path = ev.original_path # Get path from the event
 
-        # Use a PandasHelper instance to manage modifications
-        pandas_helper = PandasHelper(df, query_engine)
-        pandas_query_tool_local = FunctionTool.from_defaults(
-            async_fn=pandas_helper.execute_pandas_query,
-            name="execute_pandas_query_tool",
-            description=pandas_helper.execute_pandas_query.__doc__
+        # Create a temporary backup of original data for before/after comparisons
+        original_df = df.copy()
+        
+        print("Applying data cleaning using DataCleaner with quality assessment report...")
+        
+        # Use our enhanced DataCleaner class
+        cleaned_df, cleaning_report = clean_data(
+            df=df, 
+            assessment_report=assessment_report, 
+            save_report=True, 
+            report_path='reports/cleaning_report.json',
+            generate_plots=True, 
+            plots_dir='plots/cleaning_comparisons'
         )
+        
+        print(f"Data cleaning completed with {len(cleaning_report['cleaning_log'])} steps")
+        
+        # Update the context with cleaned DataFrame
+        await ctx.set("dataframe", cleaned_df)
+        await ctx.set("cleaning_report", cleaning_report)
+        
+        # Update the query engine with the cleaned DataFrame
+        query_engine = PandasQueryEngine(df=cleaned_df, llm=llm, verbose=True)
+        await ctx.set("query_engine", query_engine)
+        
+        # Generate a summary of the cleaning performed
+        cleaning_summary = "Data cleaning was performed with the following steps:\n"
+        for i, step in enumerate(cleaning_report['cleaning_log'], 1):
+            cleaning_summary += f"{i}. {step['action']}: "
+            if step['action'] == 'standardize_mode_values' and 'changes' in step['details']:
+                cleaning_summary += f"Standardized {step['details']['changes']} Mode values\n"
+            elif step['action'] == 'handle_missing_values':
+                cleaning_summary += f"Addressed missing values in {', '.join(step['details']['strategies'].keys())}\n"
+            elif step['action'] == 'handle_outliers':
+                cleaning_summary += f"Handled outliers in {', '.join(step['details']['columns'])} using {step['details']['method']} method\n"
+            elif step['action'] == 'handle_duplicates':
+                cleaning_summary += f"Removed {step['details']['duplicates_removed']} duplicate rows\n"
+            elif step['action'] == 'handle_impossible_values':
+                cleaning_summary += f"Fixed impossible values in {', '.join(step['details']['constraints'].keys())}\n"
+            else:
+                cleaning_summary += f"Completed\n"
+                
+        cleaning_summary += "\nBefore/After Metrics:\n"
+        metrics = cleaning_report['metrics_comparison']
+        cleaning_summary += f"- Rows: {metrics['row_count']['before']} → {metrics['row_count']['after']} ({metrics['row_count']['change']} change)\n"
+        cleaning_summary += f"- Missing values: {metrics['missing_values']['before']} → {metrics['missing_values']['after']} ({metrics['missing_values']['change']} change)\n"
+        
+        if 'numeric_stats' in metrics:
+            for col, stats in metrics['numeric_stats'].items():
+                if 'mean' in stats:
+                    cleaning_summary += f"- {col} mean: {stats['mean']['before']:.2f} → {stats['mean']['after']:.2f}\n"
+        
+        await ctx.set("modification_summary", cleaning_summary)
+        print(f"--- Cleaning Summary ---\n{cleaning_summary}\n-------------------------")
 
-        modification_agent = FunctionCallingAgent.from_tools(
-            tools=[pandas_query_tool_local],
-            llm=llm,
-            verbose=True,
-            system_prompt=(
-                "You are a data modification agent. Your task is to accurately execute pandas commands "
-                "(using 'df' and the 'execute_pandas_query_tool') described in the provided text "
-                "to clean and modify the DataFrame based on USER choices. Focus *only* on executing the modification steps described. "
-                "**IMPORTANT: NEVER use `inplace=True` in your pandas commands.** Always use assignment, e.g., `df = df[condition]` or `df['col'] = df['col'].fillna(...)` or `df['col'] = df['col'].replace(...)`. "
-                "If the description asks to standardize or correct typos in a categorical column (like 'Mode'): "
-                "1. First, use the tool to query the unique values (e.g., `df['Mode'].unique()`). "
-                "2. Based on the unique values returned and common sense for the likely categories (e.g., Car, Bus, Walk, Cycle, Bike), generate a `df['Mode'] = df['Mode'].replace({...})` command to correct *all* apparent typos (like 'Bas', 'Cra', 'Walt', 'Wilk', 'Cur', etc.) to their standard forms (e.g., 'Bus', 'Car', 'Walk'). "
-                "If asked to remove outlier rows based on a specific column (e.g., 'Distance'), use a command like `df = df[df['Distance'] < threshold]` or follow the specific strategy if provided (e.g., quantile). Adjust the threshold reasonably if only max/min is given. "
-                "If asked to fill missing values (e.g., in 'Time') use the specified method (mean or median) like `df['Time'] = df['Time'].fillna(df['Time'].mean())`." # Removed inplace=True example
-            )
+        return ModificationCompleteEvent(
+            original_path=original_path,
+            modification_summary=cleaning_summary
         )
-
-        modification_request = (
-            f"Apply the following USER-APPROVED data preparation steps using pandas commands with the 'execute_pandas_query_tool':\n"
-            f"<preparation_description>\n{ev.user_approved_description}\n</preparation_description>" 
-        )
-        print(f"--- Prompting Data Modification Agent ---\\n{modification_request}\\n------------------------------------")
-
-        await modification_agent.achat(modification_request)
-
-       
-        final_df = pandas_helper.get_final_dataframe()
-        await ctx.set("dataframe", final_df)
-        try:
-           
-            query_engine._df = final_df
-            await ctx.set("query_engine", query_engine) 
-        except AttributeError:
-            print("Warning: Could not update main query engine's _df in context after modification step.")
-
-        print("--- Data Modification Complete ---")
-
-        return ModificationCompleteEvent(original_path=original_path)
-
 
     @step
     async def analysis_reporting(self, ctx: Context, ev: ModificationCompleteEvent) -> VisualizationRequestEvent:
