@@ -1,0 +1,16 @@
+llama-index>=0.10.1
+llama-index-embeddings-openai>=0.1.1
+llama-index-vector-stores-qdrant>=0.1.1
+llama-index-llms-openai>=0.1.1
+llama-index-vector-stores-faiss>=0.1.1
+llama-index-llms-anthropic>=0.1.1
+llama-index-experimental>=0.1.0
+llama-index-llms-cerebras>=0.1.0
+qdrant-client>=1.7.0
+faiss-cpu>=1.7.4
+tavily-python>=0.3.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+python-dotenv>=1.0.0
+nest-asyncio>=1.5.0

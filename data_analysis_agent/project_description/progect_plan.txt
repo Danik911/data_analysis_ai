@@ -1,0 +1,166 @@
+1. Data Preparation (10% of grade)
+Enhanced Data Quality Assessment:
+
+Implement systematic data type verification for all columns
+Check value ranges with statistical justification (e.g., Tukey's method for outliers)
+Verify uniqueness of Case Numbers and handle any duplicates
+Identify and handle impossible values (negative distances/times, unreasonable values)
+Create data quality report including:
+
+Missing value counts and patterns
+Outlier identification with Z-scores and IQR method
+Distribution analysis pre-cleaning with normality tests
+
+
+
+Cleaning Implementation:
+
+Standardize 'Mode' values with frequency analysis to identify potential typos
+Document cleaning decisions with statistical justification
+Generate before/after comparison metrics
+Preserve original data and document transformation steps
+
+2. Exploratory Data Analysis (30% of grade)
+Comprehensive Statistical Analysis:
+
+Calculate for both overall dataset and by-mode subsets:
+
+Central tendency (mean, median, mode)
+Dispersion metrics (standard deviation, variance, IQR)
+Distribution characteristics (skewness, kurtosis)
+Confidence intervals for key metrics
+Correlation analysis between Distance and Time
+Statistical significance testing between modes
+
+
+
+Advanced Visualization Suite:
+
+Distribution analysis:
+
+Histograms with normal curve overlays
+Density plots for comparison across modes
+Q-Q plots to assess normality assumptions
+
+
+Relationship visualization:
+
+Scatter plots with trendlines by mode
+Box plots showing Time distributions by Mode
+Violin plots for comparing distributions
+
+
+Correlation visualization:
+
+Correlation heatmaps
+Pair plots with regression lines
+
+
+
+3. Model Building & Evaluation (40% of grade)
+Comprehensive Regression Analysis:
+
+Linear regression implementation:
+
+Full dataset model (Time ~ Distance)
+Individual models for each Mode (with focus on Cycle data)
+Calculate robust metrics: R, R², adjusted R², RMSE, MAE
+Confidence intervals for coefficients
+Statistical significance testing (p-values)
+
+
+
+Model Validation and Improvement:
+
+Cross-validation with k-fold approach to assess generalizability
+Residual analysis:
+
+Normality testing (Shapiro-Wilk, Anderson-Darling)
+Homoscedasticity tests (Breusch-Pagan)
+Residual plots (vs. fitted, vs. predictors)
+
+
+Comparison of alternative models:
+
+Polynomial regression (assessing optimal degree)
+Log transformations if appropriate
+Model selection using AIC/BIC criteria
+
+
+
+Predictive Application:
+
+Generate 5-10 specific examples showing:
+
+Inputs (Distance values)
+Predicted Times from full dataset model
+Predicted Times from Cycle-specific model
+Prediction intervals (not just point estimates)
+Comparison of predictions with analysis
+
+
+
+4. Report Layout and Writing Quality (20% of grade)
+Structured Report Template:
+
+Executive summary highlighting key findings
+Introduction explaining dataset and analysis goals
+Methodology section detailing:
+
+Data preparation approach with justification
+Statistical techniques with citations
+Model building strategy
+
+
+Results section presenting:
+
+Data quality findings
+EDA insights with visualizations
+Regression model results with interpretation
+Comparative analysis between models
+
+
+Discussion focusing on:
+
+Statistical interpretation of findings
+Practical implications for commuting
+Limitations of analysis
+
+
+Conclusion summarizing key insights
+
+Visual and Presentation Quality:
+
+Professional-quality visualizations with proper labeling
+Consistent formatting and styling throughout
+Clear explanations of statistical concepts
+Proper citation using Harvard referencing style
+
+5. Implementation Roadmap
+Week 1: Data Preparation & Initial EDA
+
+Days 1-2: Data quality assessment and cleaning
+Days 3-4: Basic statistical analysis and visualization
+Day 5: Documentation of preparation steps and initial findings
+
+Week 2: Advanced Analysis & Modeling
+
+Days 1-2: Complete EDA with advanced statistics
+Days 3-4: Regression modeling, validation, and comparison
+Day 5: Generate predictions and model evaluation
+
+Week 3: Reporting & Finalization
+
+Days 1-2: Draft report with visualizations
+Days 3-4: Refine analysis based on report findings
+Day 5: Final report formatting and review
+
+6. Alignment with Rubric Criteria
+For "Excellent" (80-100%) Rating:
+
+Data preparation: Complete identification and cleaning of all data issues with clear documentation
+Understanding of descriptive analytics: Comprehensive EDA with appropriate tool use and clear explanations
+Understanding of linear regression: Multiple models with thorough validation and clear observations
+Report quality: Structured report with professional visualizations and straightforward language
+
+This revised plan incorporates stronger statistical approaches, validation techniques, and a clearer alignment with the assignment rubric. The implementation roadmap provides a structured timeline to ensure all components are addressed thoroughly.

@@ -10,7 +10,7 @@ from tools.save_dataframe_tool import save_dataframe_tool
 # Load environment variables and set up LLM
 load_dotenv()
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY') or getpass("Enter OPENAI_API_KEY: ")
-llm = OpenAI(model="gpt-4o-2024-11-20", api_key=OPENAI_API_KEY, temperature=0.5, max_tokens=4096)
+llm = OpenAI(model="o3-mini-2025-01-31", api_key=OPENAI_API_KEY, temperature=0.5, max_tokens=4096)
 
 def create_agents():
     """Create and return the agents needed for our workflow"""
