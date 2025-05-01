@@ -29,19 +29,15 @@ from predictive_application import generate_prediction_examples
 # Add a new event for regression analysis
 class RegressionModelingEvent(Event):
     """Event triggered after advanced analysis to perform regression modeling"""
-    
-    def __init__(self, modified_data_path: str, statistical_report_path: str):
-        self.modified_data_path = modified_data_path
-        self.statistical_report_path = statistical_report_path
+    modified_data_path: str
+    statistical_report_path: str
 
 
 class RegressionCompleteEvent(Event):
     """Event triggered when regression modeling is complete"""
-    
-    def __init__(self, modified_data_path: str, regression_summary: str, model_quality: str):
-        self.modified_data_path = modified_data_path
-        self.regression_summary = regression_summary
-        self.model_quality = model_quality
+    modified_data_path: str
+    regression_summary: str
+    model_quality: str
 
 
 class DataAnalysisFlow(Workflow):
