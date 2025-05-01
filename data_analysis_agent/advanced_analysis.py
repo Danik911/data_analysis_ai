@@ -2,10 +2,20 @@ import os
 import json
 import pandas as pd
 import traceback
+import numpy as np
 from typing import Dict, Any, List, Optional
 from pandas_helper import PandasHelper
 from llama_index.experimental.query_engine import PandasQueryEngine
 from statistical_analysis import generate_statistical_report
+
+# New imports for advanced regression models
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import statsmodels.api as sm
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Helper function to make objects JSON serializable
 def make_json_serializable(obj):
@@ -303,3 +313,583 @@ async def summarize_statistical_findings(statistical_report: Dict[str, Any]) -> 
     
     print(f"[ADVANCED ANALYSIS] Statistical findings summary created with length {len(summary)}")
     return summary
+
+# New function for implementing polynomial regression
+def fit_polynomial_regression(df: pd.DataFrame, 
+                             target_column: str = 'Time', 
+                             predictor_column: str = 'Distance',
+                             degrees: List[int] = [2, 3, 4],
+                             test_size: float = 0.2) -> Dict[str, Any]:
+    """
+    Implement and evaluate polynomial regression models with different degrees.
+    
+    Args:
+        df: The DataFrame to analyze
+        target_column: The target variable (dependent variable)
+        predictor_column: The predictor variable (independent variable)
+        degrees: List of polynomial degrees to test
+        test_size: Proportion of data to use for testing
+        
+    Returns:
+        Dictionary with results for all polynomial models
+    """
+    print(f"[ADVANCED MODELS] Starting polynomial regression analysis with degrees {degrees}")
+    
+    # Check if columns exist
+    if target_column not in df.columns:
+        raise ValueError(f"Target column '{target_column}' not found in DataFrame")
+    if predictor_column not in df.columns:
+        raise ValueError(f"Predictor column '{predictor_column}' not found in DataFrame")
+    
+    # Prepare data
+    data = df.dropna(subset=[target_column, predictor_column]).copy()
+    
+    # Split data
+    X = data[[predictor_column]]
+    y = data[target_column]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+    
+    results = {}
+    
+    # Linear model (degree=1) as baseline
+    try:
+        # Fit linear model using statsmodels for detailed statistics
+        X_train_sm = sm.add_constant(X_train)
+        model = sm.OLS(y_train, X_train_sm).fit()
+        
+        # Make predictions
+        X_test_sm = sm.add_constant(X_test)
+        y_pred = model.predict(X_test_sm)
+        
+        # Calculate metrics
+        r2 = r2_score(y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        mae = mean_absolute_error(y_test, y_pred)
+        
+        # Add model information
+        results[1] = {
+            "degree": 1,
+            "formula": f"{target_column} = {model.params[0]:.4f} + {model.params[1]:.4f}*{predictor_column}",
+            "coefficients": model.params.tolist(),
+            "metrics": {
+                "r2": r2,
+                "rmse": rmse,
+                "mae": mae,
+                "aic": model.aic,
+                "bic": model.bic
+            },
+            "model_type": "polynomial",
+            "statsmodels_summary": model.summary().as_text()
+        }
+        
+        print(f"[ADVANCED MODELS] Linear model (degree=1): R² = {r2:.4f}, RMSE = {rmse:.4f}, AIC = {model.aic:.4f}")
+    
+    except Exception as e:
+        print(f"[ADVANCED MODELS] Error fitting linear model: {str(e)}")
+        results[1] = {"error": str(e), "degree": 1}
+    
+    # Fit polynomial models for each degree
+    for degree in degrees:
+        try:
+            # Create polynomial features
+            poly = PolynomialFeatures(degree=degree)
+            X_poly_train = poly.fit_transform(X_train)
+            X_poly_test = poly.transform(X_test)
+            
+            # Fit linear regression on polynomial features
+            model = LinearRegression()
+            model.fit(X_poly_train, y_train)
+            
+            # Make predictions
+            y_pred = model.predict(X_poly_test)
+            
+            # Calculate metrics
+            r2 = r2_score(y_test, y_pred)
+            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+            mae = mean_absolute_error(y_test, y_pred)
+            
+            # Create formula string
+            feature_names = poly.get_feature_names_out(input_features=[predictor_column])
+            formula = f"{target_column} = {model.intercept_:.4f}"
+            for i, coef in enumerate(model.coef_[1:], 1):  # Skip intercept term
+                formula += f" + {coef:.4f}*{feature_names[i]}"
+            
+            # Use statsmodels for AIC/BIC
+            X_poly_sm = sm.add_constant(X_poly_train[:, 1:])  # Skip the first column (already ones)
+            sm_model = sm.OLS(y_train, X_poly_sm).fit()
+            
+            results[degree] = {
+                "degree": degree,
+                "formula": formula,
+                "coefficients": model.coef_.tolist(),
+                "intercept": float(model.intercept_),
+                "metrics": {
+                    "r2": r2,
+                    "rmse": rmse,
+                    "mae": mae,
+                    "aic": sm_model.aic,
+                    "bic": sm_model.bic
+                },
+                "model_type": "polynomial",
+                "feature_names": feature_names.tolist()
+            }
+            
+            print(f"[ADVANCED MODELS] Polynomial model (degree={degree}): R² = {r2:.4f}, RMSE = {rmse:.4f}, AIC = {sm_model.aic:.4f}")
+        
+        except Exception as e:
+            print(f"[ADVANCED MODELS] Error fitting polynomial model with degree {degree}: {str(e)}")
+            results[degree] = {"error": str(e), "degree": degree}
+    
+    # Find best model based on AIC
+    valid_models = {k: v for k, v in results.items() if "error" not in v}
+    if valid_models:
+        best_degree = min(valid_models.items(), 
+                          key=lambda x: x[1]['metrics']['aic'] if 'metrics' in x[1] else float('inf'))[0]
+        results["best_model"] = {
+            "degree": best_degree,
+            "selection_criterion": "AIC",
+            "metrics": results[best_degree].get("metrics", {})
+        }
+        print(f"[ADVANCED MODELS] Best polynomial model based on AIC: degree={best_degree}")
+    
+    return results
+
+# New function for implementing log transformation models
+def fit_log_transformation_models(df: pd.DataFrame, 
+                                target_column: str = 'Time', 
+                                predictor_column: str = 'Distance',
+                                test_size: float = 0.2) -> Dict[str, Any]:
+    """
+    Implement and evaluate log-transformed regression models.
+    
+    Args:
+        df: The DataFrame to analyze
+        target_column: The target variable (dependent variable)
+        predictor_column: The predictor variable (independent variable)
+        test_size: Proportion of data to use for testing
+        
+    Returns:
+        Dictionary with results for all log-transformed models
+    """
+    print(f"[ADVANCED MODELS] Starting log transformation model analysis")
+    
+    # Check if columns exist
+    if target_column not in df.columns:
+        raise ValueError(f"Target column '{target_column}' not found in DataFrame")
+    if predictor_column not in df.columns:
+        raise ValueError(f"Predictor column '{predictor_column}' not found in DataFrame")
+    
+    # Prepare data
+    data = df.dropna(subset=[target_column, predictor_column]).copy()
+    
+    # Ensure values are positive for log transformation
+    if (data[target_column] <= 0).any() or (data[predictor_column] <= 0).any():
+        print("[ADVANCED MODELS] Warning: Some values are ≤ 0, adding small constant for log transformation")
+        # Add small constant to non-positive values
+        min_target = data[data[target_column] > 0][target_column].min()
+        min_predictor = data[data[predictor_column] > 0][predictor_column].min()
+        
+        # Add 1% of minimum value or 0.01, whichever is larger
+        target_offset = max(0.01, min_target * 0.01) if not pd.isna(min_target) else 0.01
+        predictor_offset = max(0.01, min_predictor * 0.01) if not pd.isna(min_predictor) else 0.01
+        
+        # Apply offsets to ensure all values are positive
+        data.loc[data[target_column] <= 0, target_column] = target_offset
+        data.loc[data[predictor_column] <= 0, predictor_column] = predictor_offset
+    
+    # Create log-transformed variables
+    data['log_target'] = np.log(data[target_column])
+    data['log_predictor'] = np.log(data[predictor_column])
+    
+    # Define transformation types to test
+    transformations = [
+        {'name': 'linear', 'x': predictor_column, 'y': target_column, 'formula': 'y ~ x'},
+        {'name': 'log_x', 'x': 'log_predictor', 'y': target_column, 'formula': 'y ~ log(x)'},
+        {'name': 'log_y', 'x': predictor_column, 'y': 'log_target', 'formula': 'log(y) ~ x'},
+        {'name': 'log_log', 'x': 'log_predictor', 'y': 'log_target', 'formula': 'log(y) ~ log(x)'}
+    ]
+    
+    results = {}
+    
+    for transform in transformations:
+        try:
+            # Split data
+            X = data[[transform['x']]].values
+            y = data[transform['y']].values
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+            
+            # Fit linear model using statsmodels
+            X_train_sm = sm.add_constant(X_train)
+            model = sm.OLS(y_train, X_train_sm).fit()
+            
+            # Make predictions
+            X_test_sm = sm.add_constant(X_test)
+            y_pred = model.predict(X_test_sm)
+            
+            # Calculate metrics
+            r2 = r2_score(y_test, y_pred)
+            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+            mae = mean_absolute_error(y_test, y_pred)
+            
+            # Create actual formula with coefficients
+            if transform['name'] == 'linear':
+                formula = f"{target_column} = {model.params[0]:.4f} + {model.params[1]:.4f}*{predictor_column}"
+            elif transform['name'] == 'log_x':
+                formula = f"{target_column} = {model.params[0]:.4f} + {model.params[1]:.4f}*log({predictor_column})"
+            elif transform['name'] == 'log_y':
+                formula = f"log({target_column}) = {model.params[0]:.4f} + {model.params[1]:.4f}*{predictor_column}"
+                formula += f"\n{target_column} = exp({model.params[0]:.4f} + {model.params[1]:.4f}*{predictor_column})"
+            else:  # log_log
+                formula = f"log({target_column}) = {model.params[0]:.4f} + {model.params[1]:.4f}*log({predictor_column})"
+                formula += f"\n{target_column} = exp({model.params[0]:.4f})*{predictor_column}^{model.params[1]:.4f}"
+            
+            results[transform['name']] = {
+                "transformation": transform['name'],
+                "formula_type": transform['formula'],
+                "detailed_formula": formula,
+                "coefficients": model.params.tolist(),
+                "metrics": {
+                    "r2": r2,
+                    "rmse": rmse,
+                    "mae": mae,
+                    "aic": model.aic,
+                    "bic": model.bic
+                },
+                "model_type": "log_transformation"
+            }
+            
+            print(f"[ADVANCED MODELS] {transform['name']} model: R² = {r2:.4f}, RMSE = {rmse:.4f}, AIC = {model.aic:.4f}")
+        
+        except Exception as e:
+            print(f"[ADVANCED MODELS] Error fitting {transform['name']} model: {str(e)}")
+            results[transform['name']] = {"error": str(e), "transformation": transform['name']}
+    
+    # Find best model based on AIC
+    valid_models = {k: v for k, v in results.items() if "error" not in v}
+    if valid_models:
+        best_transform = min(valid_models.items(), 
+                            key=lambda x: x[1]['metrics']['aic'] if 'metrics' in x[1] else float('inf'))[0]
+        results["best_model"] = {
+            "transformation": best_transform,
+            "selection_criterion": "AIC",
+            "metrics": results[best_transform].get("metrics", {})
+        }
+        print(f"[ADVANCED MODELS] Best log transformation model based on AIC: {best_transform}")
+    
+    return results
+
+# New function to compare and visualize alternative models
+def compare_alternative_models(df: pd.DataFrame,
+                              polynomial_results: Dict[str, Any],
+                              log_results: Dict[str, Any],
+                              target_column: str = 'Time', 
+                              predictor_column: str = 'Distance',
+                              output_dir: str = "plots/models") -> Dict[str, Any]:
+    """
+    Compare alternative regression models and generate comparison visualizations.
+    
+    Args:
+        df: The DataFrame with the data
+        polynomial_results: Results from polynomial regression
+        log_results: Results from log transformation models
+        target_column: The target variable (dependent variable)
+        predictor_column: The predictor variable (independent variable)
+        output_dir: Directory to save comparison plots
+        
+    Returns:
+        Dictionary with comparison results and plot paths
+    """
+    print("[ADVANCED MODELS] Comparing alternative regression models")
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Extract metrics for each model type
+    linear_metrics = polynomial_results.get(1, {}).get('metrics', {})
+    
+    # Get best polynomial model metrics
+    best_poly_degree = polynomial_results.get('best_model', {}).get('degree')
+    if best_poly_degree and best_poly_degree in polynomial_results:
+        best_poly_metrics = polynomial_results[best_poly_degree].get('metrics', {})
+        poly_formula = polynomial_results[best_poly_degree].get('formula', 'Formula not available')
+    else:
+        best_poly_metrics = {}
+        poly_formula = 'Not available'
+    
+    # Get best log transformation model metrics
+    best_log_transform = log_results.get('best_model', {}).get('transformation')
+    if best_log_transform and best_log_transform in log_results:
+        best_log_metrics = log_results[best_log_transform].get('metrics', {})
+        log_formula = log_results[best_log_transform].get('detailed_formula', 'Formula not available')
+    else:
+        best_log_metrics = {}
+        log_formula = 'Not available'
+    
+    # Compile all metrics for comparison
+    comparison = {
+        "linear_model": {
+            "name": "Linear Regression",
+            "metrics": linear_metrics,
+            "formula": f"{target_column} = {polynomial_results.get(1, {}).get('coefficients', [0, 0])[0]:.4f} + {polynomial_results.get(1, {}).get('coefficients', [0, 0])[1]:.4f}*{predictor_column}" if 1 in polynomial_results else "Not available"
+        },
+        "best_polynomial": {
+            "name": f"Polynomial (degree={best_poly_degree})" if best_poly_degree else "Not available",
+            "metrics": best_poly_metrics,
+            "formula": poly_formula,
+            "degree": best_poly_degree
+        },
+        "best_log_transform": {
+            "name": f"Log Transformation ({best_log_transform})" if best_log_transform else "Not available",
+            "metrics": best_log_metrics,
+            "formula": log_formula,
+            "transformation": best_log_transform
+        }
+    }
+    
+    # Determine overall best model based on AIC
+    valid_models = []
+    
+    if linear_metrics and 'aic' in linear_metrics:
+        valid_models.append(('linear_model', linear_metrics['aic']))
+    
+    if best_poly_metrics and 'aic' in best_poly_metrics:
+        valid_models.append(('best_polynomial', best_poly_metrics['aic']))
+    
+    if best_log_metrics and 'aic' in best_log_metrics:
+        valid_models.append(('best_log_transform', best_log_metrics['aic']))
+    
+    if valid_models:
+        best_model_key = min(valid_models, key=lambda x: x[1])[0]
+        comparison['overall_best_model'] = best_model_key
+        comparison['selection_criterion'] = 'AIC'
+        print(f"[ADVANCED MODELS] Overall best model based on AIC: {best_model_key}")
+    
+    # Generate comparison plot
+    plot_paths = []
+    
+    try:
+        plt.figure(figsize=(12, 8))
+        
+        # Scatter plot of actual data
+        sns.scatterplot(data=df, x=predictor_column, y=target_column, alpha=0.4, label='Actual Data')
+        
+        # Create a range of x values for prediction
+        x_min = df[predictor_column].min()
+        x_max = df[predictor_column].max()
+        x_range = np.linspace(x_min, x_max, 100)
+        
+        # Plot linear model
+        if 1 in polynomial_results and 'coefficients' in polynomial_results[1]:
+            coef = polynomial_results[1]['coefficients']
+            y_linear = coef[0] + coef[1] * x_range
+            plt.plot(x_range, y_linear, label='Linear', color='red', linewidth=2)
+        
+        # Plot best polynomial model
+        if best_poly_degree and best_poly_degree in polynomial_results:
+            poly = PolynomialFeatures(degree=best_poly_degree)
+            x_poly = poly.fit_transform(x_range.reshape(-1, 1))
+            
+            if 'coefficients' in polynomial_results[best_poly_degree] and 'intercept' in polynomial_results[best_poly_degree]:
+                coef = polynomial_results[best_poly_degree]['coefficients']
+                intercept = polynomial_results[best_poly_degree]['intercept']
+                
+                # For sklearn models, intercept is separate
+                y_poly = intercept
+                for i, c in enumerate(coef):
+                    y_poly += c * x_poly[:, i]
+                
+                plt.plot(x_range, y_poly, label=f'Polynomial (degree={best_poly_degree})', 
+                        color='green', linewidth=2)
+        
+        # Plot best log transformation model
+        if best_log_transform and best_log_transform in log_results and 'coefficients' in log_results[best_log_transform]:
+            coef = log_results[best_log_transform]['coefficients']
+            
+            if best_log_transform == 'linear':
+                y_log = coef[0] + coef[1] * x_range
+            elif best_log_transform == 'log_x':
+                y_log = coef[0] + coef[1] * np.log(x_range)
+            elif best_log_transform == 'log_y':
+                y_log = np.exp(coef[0] + coef[1] * x_range)
+            else:  # log_log
+                y_log = np.exp(coef[0]) * x_range ** coef[1]
+            
+            plt.plot(x_range, y_log, label=f'Log Transform ({best_log_transform})', 
+                    color='blue', linewidth=2)
+        
+        plt.title('Comparison of Alternative Regression Models')
+        plt.xlabel(predictor_column)
+        plt.ylabel(target_column)
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # Save comparison plot
+        comparison_plot_path = os.path.join(output_dir, "model_comparison.png")
+        plt.savefig(comparison_plot_path)
+        plt.close()
+        plot_paths.append(comparison_plot_path)
+        print(f"[ADVANCED MODELS] Saved model comparison plot: {comparison_plot_path}")
+        
+        # Generate AIC/BIC comparison bar chart
+        valid_models_for_plot = []
+        model_names = []
+        aic_values = []
+        bic_values = []
+        
+        if 'metrics' in comparison['linear_model'] and 'aic' in comparison['linear_model']['metrics']:
+            valid_models_for_plot.append('linear_model')
+            model_names.append('Linear')
+            aic_values.append(comparison['linear_model']['metrics']['aic'])
+            bic_values.append(comparison['linear_model']['metrics']['bic'])
+        
+        if 'metrics' in comparison['best_polynomial'] and 'aic' in comparison['best_polynomial']['metrics']:
+            valid_models_for_plot.append('best_polynomial')
+            model_names.append(f'Poly (d={best_poly_degree})')
+            aic_values.append(comparison['best_polynomial']['metrics']['aic'])
+            bic_values.append(comparison['best_polynomial']['metrics']['bic'])
+        
+        if 'metrics' in comparison['best_log_transform'] and 'aic' in comparison['best_log_transform']['metrics']:
+            valid_models_for_plot.append('best_log_transform')
+            model_names.append(f'Log ({best_log_transform})')
+            aic_values.append(comparison['best_log_transform']['metrics']['aic'])
+            bic_values.append(comparison['best_log_transform']['metrics']['bic'])
+        
+        if valid_models_for_plot:
+            plt.figure(figsize=(10, 6))
+            x = np.arange(len(model_names))
+            width = 0.35
+            
+            plt.bar(x - width/2, aic_values, width, label='AIC')
+            plt.bar(x + width/2, bic_values, width, label='BIC')
+            
+            plt.xlabel('Model Type')
+            plt.ylabel('Criterion Value (Lower is Better)')
+            plt.title('Model Selection Criteria Comparison')
+            plt.xticks(x, model_names)
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            for i, v in enumerate(aic_values):
+                plt.text(i - width/2, v + 5, f'{v:.1f}', ha='center')
+            
+            for i, v in enumerate(bic_values):
+                plt.text(i + width/2, v + 5, f'{v:.1f}', ha='center')
+            
+            # Save AIC/BIC comparison plot
+            criterion_plot_path = os.path.join(output_dir, "model_selection_criteria.png")
+            plt.savefig(criterion_plot_path)
+            plt.close()
+            plot_paths.append(criterion_plot_path)
+            print(f"[ADVANCED MODELS] Saved model selection criteria plot: {criterion_plot_path}")
+        
+    except Exception as e:
+        print(f"[ADVANCED MODELS] Error generating comparison plots: {str(e)}")
+        traceback.print_exc()
+    
+    comparison['plot_paths'] = plot_paths
+    
+    return comparison
+
+# New function to implement, compare, and evaluate alternative models
+def perform_advanced_modeling(df: pd.DataFrame,
+                           target_column: str = 'Time', 
+                           predictor_column: str = 'Distance',
+                           save_report: bool = True,
+                           report_path: str = "reports/advanced_models.json",
+                           generate_plots: bool = True,
+                           plots_dir: str = "plots/models") -> Dict[str, Any]:
+    """
+    Implement and evaluate alternative regression models including polynomial and log transformations.
+    
+    Args:
+        df: The DataFrame to analyze
+        target_column: The target variable (dependent variable)
+        predictor_column: The predictor variable (independent variable)
+        save_report: Whether to save the report to a file
+        report_path: Path to save the report
+        generate_plots: Whether to generate model visualization plots
+        plots_dir: Directory to save plots in
+        
+    Returns:
+        Dictionary with advanced modeling results
+    """
+    print(f"[ADVANCED MODELS] Starting advanced modeling analysis: {target_column} ~ {predictor_column}")
+    
+    try:
+        # 1. Run polynomial regression with degrees 2-4
+        polynomial_results = fit_polynomial_regression(
+            df=df,
+            target_column=target_column,
+            predictor_column=predictor_column,
+            degrees=[2, 3, 4]
+        )
+        
+        # 2. Run log transformation models
+        log_results = fit_log_transformation_models(
+            df=df,
+            target_column=target_column,
+            predictor_column=predictor_column
+        )
+        
+        # 3. Compare models and generate visualizations
+        if generate_plots:
+            comparison = compare_alternative_models(
+                df=df,
+                polynomial_results=polynomial_results,
+                log_results=log_results,
+                target_column=target_column,
+                predictor_column=predictor_column,
+                output_dir=plots_dir
+            )
+        else:
+            # Compare without generating plots
+            comparison = {
+                "linear_model": {
+                    "name": "Linear Regression",
+                    "metrics": polynomial_results.get(1, {}).get('metrics', {})
+                },
+                "best_polynomial": {
+                    "name": f"Polynomial (degree={polynomial_results.get('best_model', {}).get('degree')})",
+                    "metrics": polynomial_results.get(polynomial_results.get('best_model', {}).get('degree', 1), {}).get('metrics', {})
+                },
+                "best_log_transform": {
+                    "name": f"Log Transformation ({log_results.get('best_model', {}).get('transformation')})",
+                    "metrics": log_results.get(log_results.get('best_model', {}).get('transformation', ''), {}).get('metrics', {})
+                }
+            }
+        
+        # Determine overall best model
+        overall_results = {
+            "polynomial_models": polynomial_results,
+            "log_transformation_models": log_results,
+            "model_comparison": comparison,
+            "status": "success"
+        }
+        
+        # Save results to file if requested
+        if save_report:
+            # Make values JSON serializable
+            serializable_results = make_json_serializable(overall_results)
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(report_path), exist_ok=True)
+            
+            # Write to file
+            with open(report_path, 'w') as f:
+                json.dump(serializable_results, f, indent=2)
+            
+            print(f"[ADVANCED MODELS] Advanced modeling results saved to {report_path}")
+            overall_results['report_path'] = report_path
+        
+        print(f"[ADVANCED MODELS] Advanced modeling analysis completed successfully")
+        return overall_results
+    
+    except Exception as e:
+        import traceback
+        print(f"[ADVANCED MODELS ERROR] Error in advanced modeling: {str(e)}")
+        print(traceback.format_exc())
+        return {
+            "status": "error",
+            "error_message": str(e),
+            "traceback": traceback.format_exc()
+        }

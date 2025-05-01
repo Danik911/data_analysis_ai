@@ -19,7 +19,30 @@ from statistical_analysis import generate_statistical_report
 from visualization import generate_visualizations
 from reporting import generate_report
 from consultation import handle_user_consultation
-from advanced_analysis import perform_advanced_analysis, summarize_statistical_findings
+from advanced_analysis import perform_advanced_analysis, summarize_statistical_findings, perform_advanced_modeling
+
+# Import new Phase 3 modules
+from regression_analysis import perform_regression_analysis, RegressionModel
+from model_validation import validate_regression_model
+from predictive_application import generate_prediction_examples
+
+# Add a new event for regression analysis
+class RegressionModelingEvent(Event):
+    """Event triggered after advanced analysis to perform regression modeling"""
+    
+    def __init__(self, modified_data_path: str, statistical_report_path: str):
+        self.modified_data_path = modified_data_path
+        self.statistical_report_path = statistical_report_path
+
+
+class RegressionCompleteEvent(Event):
+    """Event triggered when regression modeling is complete"""
+    
+    def __init__(self, modified_data_path: str, regression_summary: str, model_quality: str):
+        self.modified_data_path = modified_data_path
+        self.regression_summary = regression_summary
+        self.model_quality = model_quality
+
 
 class DataAnalysisFlow(Workflow):
     
@@ -242,7 +265,7 @@ class DataAnalysisFlow(Workflow):
         )
 
     @step
-    async def advanced_statistical_analysis(self, ctx: Context, ev: ModificationCompleteEvent) -> AdvancedAnalysisCompleteEvent:
+    async def advanced_statistical_analysis(self, ctx: Context, ev: ModificationCompleteEvent) -> RegressionModelingEvent:
         """Performs advanced statistical analysis on the cleaned data including advanced measures and significance testing.""" 
         print("--- Running Advanced Statistical Analysis Step ---")
         df: pd.DataFrame = await ctx.get("dataframe")
@@ -262,22 +285,180 @@ class DataAnalysisFlow(Workflow):
         await ctx.set("statistical_summary", analysis_results["summary"])
         await ctx.set("advanced_plot_info", analysis_results["plot_info"])
         
-        return AdvancedAnalysisCompleteEvent(
+        # Continue to regression modeling step
+        return RegressionModelingEvent(
             modified_data_path=analysis_results["modified_data_path"],
-            report=analysis_results["summary"],
             statistical_report_path=analysis_results["statistical_report_path"]
         )
 
     @step
-    async def analysis_reporting(self, ctx: Context, ev: AdvancedAnalysisCompleteEvent) -> VisualizationRequestEvent:
+    async def regression_modeling(self, ctx: Context, ev: RegressionModelingEvent) -> RegressionCompleteEvent:
+        """Performs regression analysis including linear regression and advanced models."""
+        print("--- Running Regression Modeling Step (Phase 3) ---")
+        df: pd.DataFrame = await ctx.get("dataframe")
+        target_column = 'Time'
+        predictor_column = 'Distance'
+        
+        # 1. Perform Linear Regression Analysis
+        print("[REGRESSION] Starting linear regression analysis")
+        regression_results = perform_regression_analysis(
+            df=df,
+            target_column=target_column, 
+            predictor_column=predictor_column,
+            save_report=True,
+            report_path="reports/regression_models.json",
+            generate_plots=True,
+            plots_dir="plots/regression"
+        )
+        
+        # Store regression model in context for later use
+        regression_model = RegressionModel(df, target_column, predictor_column)
+        regression_model.fit_full_dataset_model()
+        if 'Mode' in df.columns:
+            regression_model.fit_mode_specific_models(mode_column='Mode')
+        await ctx.set("regression_model", regression_model)
+        
+        # Store regression results in context
+        await ctx.set("regression_results", regression_results)
+        
+        # 2. Perform Model Validation
+        print("[REGRESSION] Validating regression models")
+        full_model = regression_model.models.get('full_dataset')
+        if full_model:
+            X = df[[predictor_column]]
+            y = df[target_column]
+            
+            validation_results = validate_regression_model(
+                model=full_model,
+                X=X,
+                y=y,
+                model_name="Time-Distance Regression",
+                feature_names=[predictor_column],
+                save_report=True,
+                report_path="reports/model_validation.json",
+                generate_plots=True,
+                plots_dir="plots/validation"
+            )
+            
+            # Store validation results
+            await ctx.set("validation_results", validation_results)
+            
+            # Check if model meets assumptions
+            assumptions_met = validation_results.get('assumptions_met', {})
+            model_quality = "High" if all(assumptions_met.values()) else "Medium" if any(assumptions_met.values()) else "Low"
+            await ctx.set("model_quality", model_quality)
+        else:
+            validation_results = {"status": "error", "error_message": "Full dataset model not available"}
+            model_quality = "Unknown"
+            await ctx.set("model_quality", model_quality)
+        
+        # 3. Perform Advanced Modeling
+        print("[REGRESSION] Running advanced modeling analysis")
+        advanced_modeling_results = perform_advanced_modeling(
+            df=df,
+            target_column=target_column,
+            predictor_column=predictor_column,
+            save_report=True,
+            report_path="reports/advanced_models.json",
+            generate_plots=True,
+            plots_dir="plots/models"
+        )
+        
+        # Store advanced modeling results
+        await ctx.set("advanced_modeling_results", advanced_modeling_results)
+        
+        # 4. Generate Prediction Examples
+        print("[REGRESSION] Generating prediction examples")
+        prediction_results = generate_prediction_examples(
+            regression_model=regression_model,
+            save_report=True,
+            report_path="reports/prediction_results.json",
+            generate_plots=True,
+            plots_dir="plots/predictions"
+        )
+        
+        # Store prediction results
+        await ctx.set("prediction_results", prediction_results)
+        
+        # Prepare regression summary
+        regression_summary = "## Regression Analysis Summary\n\n"
+        
+        # Add linear model summary
+        if regression_results.get('status') == 'success':
+            full_model_info = regression_results.get('full_model', {})
+            regression_summary += "### Linear Model\n"
+            regression_summary += f"- Formula: {full_model_info.get('formula', 'N/A')}\n"
+            metrics = full_model_info.get('metrics', {})
+            regression_summary += f"- R-squared: {metrics.get('r_squared', 'N/A'):.4f}\n"
+            regression_summary += f"- RMSE: {metrics.get('rmse', 'N/A'):.4f}\n"
+            
+            # Add mode-specific models summary if available
+            mode_models = regression_results.get('mode_models', {})
+            if mode_models:
+                regression_summary += "\n### Mode-Specific Models\n"
+                for mode, model_info in mode_models.items():
+                    regression_summary += f"- **{mode}**: {model_info.get('formula', 'N/A')}\n"
+                    mode_metrics = model_info.get('metrics', {})
+                    regression_summary += f"  - R-squared: {mode_metrics.get('r_squared', 'N/A'):.4f}\n"
+            
+        # Add model validation summary
+        if validation_results.get('status') == 'success':
+            regression_summary += "\n### Model Validation\n"
+            assumptions = validation_results.get('assumptions_met', {})
+            regression_summary += f"- Normality of residuals: {'✅ Met' if assumptions.get('normality', False) else '❌ Not met'}\n"
+            regression_summary += f"- Homoscedasticity: {'✅ Met' if assumptions.get('homoscedasticity', False) else '❌ Not met'}\n"
+            regression_summary += f"- Zero mean residuals: {'✅ Met' if assumptions.get('zero_mean_residuals', False) else '❌ Not met'}\n"
+            
+            cv_metrics = validation_results.get('cross_validation', {}).get('metrics', {})
+            regression_summary += f"- Cross-validation R²: {cv_metrics.get('r2_mean', 'N/A'):.4f} (±{cv_metrics.get('r2_std', 'N/A'):.4f})\n"
+        
+        # Add advanced modeling summary
+        if advanced_modeling_results.get('status') == 'success':
+            comparison = advanced_modeling_results.get('model_comparison', {})
+            best_model_key = comparison.get('overall_best_model')
+            
+            regression_summary += "\n### Alternative Models\n"
+            
+            if best_model_key and best_model_key in comparison:
+                best_model = comparison.get(best_model_key, {})
+                regression_summary += f"- Best model: {best_model.get('name', 'Unknown')}\n"
+                
+                best_metrics = best_model.get('metrics', {})
+                if best_metrics:
+                    regression_summary += f"- AIC: {best_metrics.get('aic', 'N/A'):.2f}\n"
+                    regression_summary += f"- BIC: {best_metrics.get('bic', 'N/A'):.2f}\n"
+                    regression_summary += f"- R-squared: {best_metrics.get('r2', 'N/A'):.4f}\n"
+        
+        # Add prediction example summary
+        if prediction_results.get('status') == 'success':
+            regression_summary += "\n### Predictions\n"
+            regression_summary += "- Prediction examples generated for full dataset model"
+            if 'mode_bus' in regression_model.models:
+                regression_summary += " and mode-specific models"
+            regression_summary += "\n"
+            regression_summary += "- See prediction plots in plots/predictions/ directory\n"
+        
+        return RegressionCompleteEvent(
+            modified_data_path=ev.modified_data_path,
+            regression_summary=regression_summary,
+            model_quality=model_quality
+        )
+
+    @step
+    async def analysis_reporting(self, ctx: Context, ev: RegressionCompleteEvent) -> VisualizationRequestEvent:
         """Performs analysis on the modified data, generates a report, and saves.""" 
         print("--- Running Analysis & Reporting Step ---")
         df: pd.DataFrame = await ctx.get("dataframe") 
         original_path: str = ev.modified_data_path
-        statistical_summary = ev.report
         
         # Get the modification summary from context
         modification_summary = await ctx.get("modification_summary", "Modification summary not available.")
+        
+        # Get the statistical summary from context
+        statistical_summary = await ctx.get("statistical_summary", "Statistical summary not available.")
+        
+        # Add regression summary to the report
+        combined_summary = statistical_summary + "\n\n" + ev.regression_summary
         
         # Use the refactored reporting module
         reporting_results = await generate_report(
@@ -285,16 +466,20 @@ class DataAnalysisFlow(Workflow):
             llm=llm,
             original_path=original_path,
             modification_summary=modification_summary,
-            statistical_summary=statistical_summary
+            statistical_summary=combined_summary
         )
         
         # Update context with final dataframe
         await ctx.set("dataframe", reporting_results["final_df"])
         await ctx.set("final_report", reporting_results["final_report"])
         
-        # Combine the report with information about the advanced plots
+        # Combine the report with information about the advanced plots and regression quality
         advanced_plot_info = await ctx.get("advanced_plot_info", "Advanced plot information not available.")
-        enhanced_report = reporting_results["final_report"] + "\n\n## Advanced Visualizations\n\n" + advanced_plot_info
+        
+        # Add model quality information
+        model_quality_info = f"\n\n## Model Quality Assessment\n\nRegression Model Quality: {ev.model_quality}\n"
+        
+        enhanced_report = reporting_results["final_report"] + "\n\n## Advanced Visualizations\n\n" + advanced_plot_info + model_quality_info
         
         return VisualizationRequestEvent(
             modified_data_path=reporting_results["modified_file_path"],
