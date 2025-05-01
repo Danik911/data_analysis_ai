@@ -37,4 +37,10 @@ class CleaningResponseEvent(Event):
 class VisualizationRequestEvent(Event):
     """Event indicating that data visualization is requested."""
     modified_data_path: str 
-    report: str             
+    report: str
+
+class AdvancedAnalysisCompleteEvent(Event):
+    """Event indicating that advanced statistical analysis is complete."""
+    modified_data_path: str
+    report: str
+    statistical_report_path: str

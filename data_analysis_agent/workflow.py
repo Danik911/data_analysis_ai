@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import re
 import functools
+import json
+import traceback
 from llama_index.experimental.query_engine import PandasQueryEngine
 from llama_index.core.workflow import Event, Workflow, Context, StopEvent, step
 from llama_index.core.workflow import StartEvent
@@ -11,6 +13,7 @@ from pandas_helper import PandasHelper
 from events import *
 from agents import create_agents, llm
 from data_quality import DataQualityAssessment, DataCleaner, assess_data_quality, clean_data
+from statistical_analysis import generate_statistical_report
 
 class DataAnalysisFlow(Workflow):
     
@@ -244,10 +247,9 @@ class DataAnalysisFlow(Workflow):
             original_path=original_path
         )
 
-
     @step
     async def data_modification(self, ctx: Context, ev: ModificationRequestEvent) -> ModificationCompleteEvent:
-        """Applies the data modifications using the DataCleaner class based on user input."""
+        """Applies the data modifications using the DataCleaner class based on user input.""" 
         print("--- Running Enhanced Data Modification Step ---")
         df: pd.DataFrame = await ctx.get("dataframe")
         assessment_report = await ctx.get("assessment_report")
@@ -314,16 +316,163 @@ class DataAnalysisFlow(Workflow):
         )
 
     @step
-    async def analysis_reporting(self, ctx: Context, ev: ModificationCompleteEvent) -> VisualizationRequestEvent:
-        """Performs analysis on the modified data, generates a report, and saves."""
+    async def advanced_statistical_analysis(self, ctx: Context, ev: ModificationCompleteEvent) -> AdvancedAnalysisCompleteEvent:
+        """Performs advanced statistical analysis on the cleaned data including advanced measures and significance testing.""" 
+        print("--- Running Advanced Statistical Analysis Step ---")
+        print("[DEBUG] Starting advanced statistical analysis...")
+        df: pd.DataFrame = await ctx.get("dataframe")
+        print(f"[DEBUG] DataFrame shape: {df.shape}")
+        print(f"[DEBUG] DataFrame columns: {df.columns.tolist()}")
+        print(f"[DEBUG] DataFrame data types: {df.dtypes.to_dict()}")
+        
+        original_path: str = ev.original_path
+        modification_summary: str = ev.modification_summary
+
+        # Create a helper instance with the cleaned DataFrame
+        query_engine = PandasQueryEngine(df=df, llm=llm, verbose=False)
+        pandas_helper = PandasHelper(df, query_engine)
+        
+        # Create directory for reports if it doesn't exist
+        os.makedirs("reports", exist_ok=True)
+        
+        # Define the path for the statistical analysis report
+        statistical_report_path = "reports/statistical_analysis_report.json"
+        
+        print("[DEBUG] Performing advanced statistical analysis...")
+        
+        # Perform advanced statistical analysis using the helper method
+        print("[DEBUG] Calling pandas_helper.perform_advanced_analysis...")
+        statistical_report = await pandas_helper.perform_advanced_analysis(
+            save_report=True,
+            report_path=statistical_report_path
+        )
+        
+        # Store the statistical report in the context
+        await ctx.set("statistical_report", statistical_report)
+        print(f"[DEBUG] Statistical report generated and stored in context. Report keys: {statistical_report.keys()}")
+        
+        # Generate a summary of the statistical analysis
+        summary = "Advanced Statistical Analysis Complete\n\n"
+        
+        try:
+            # Add advanced statistics summary
+            if "advanced_statistics" in statistical_report:
+                summary += "## Advanced Statistics\n\n"
+                print(f"[DEBUG] Processing advanced statistics for columns: {list(statistical_report['advanced_statistics'].keys())}")
+                for column, stats in statistical_report["advanced_statistics"].items():
+                    summary += f"### {column}\n"
+                    summary += f"- Mean: {stats.get('mean', 'N/A'):.2f}\n"
+                    summary += f"- Median: {stats.get('median', 'N/A'):.2f}\n"
+                    summary += f"- Standard Deviation: {stats.get('std', 'N/A'):.2f}\n"
+                    summary += f"- Skewness: {stats.get('skewness', 'N/A'):.2f}\n"
+                    summary += f"- Kurtosis: {stats.get('kurtosis', 'N/A'):.2f}\n"
+                    
+                    # Add confidence intervals if available
+                    if 'ci_95_low' in stats and 'ci_95_high' in stats:
+                        summary += f"- 95% Confidence Interval: ({stats['ci_95_low']:.2f}, {stats['ci_95_high']:.2f})\n"
+                    
+                    # Add normality test results if available
+                    if 'is_normal' in stats:
+                        summary += f"- Normality (Shapiro-Wilk): {'Normal' if stats['is_normal'] else 'Not normal'}\n"
+                    
+                    summary += "\n"
+            
+            # Add significance test results
+            if "significance_tests" in statistical_report:
+                summary += "## Significance Tests\n\n"
+                print(f"[DEBUG] Processing significance tests for columns: {list(statistical_report['significance_tests'].keys())}")
+                for column, test_results in statistical_report["significance_tests"].items():
+                    summary += f"### {column}\n"
+                    
+                    # Add ANOVA results
+                    if "anova_result" in test_results:
+                        anova = test_results["anova_result"]
+                        if "is_significant" in anova:
+                            is_significant = anova["is_significant"]
+                            summary += f"- ANOVA: {'Significant differences found' if is_significant else 'No significant differences'}\n"
+                            if "f_statistic" in anova and "p_value" in anova:
+                                summary += f"  - F-statistic: {anova['f_statistic']:.2f}, p-value: {anova['p_value']:.4f}\n"
+                    
+                    # Add Tukey HSD results if available
+                    if "pairwise_results" in test_results and test_results["pairwise_results"]:
+                        summary += "- Tukey HSD Pairwise Comparisons:\n"
+                        for pair in test_results["pairwise_results"]:
+                            if "group1" in pair and "group2" in pair and "is_significant" in pair:
+                                sig_text = "Significant" if pair["is_significant"] else "Not significant"
+                                summary += f"  - {pair['group1']} vs {pair['group2']}: {sig_text}\n"
+                                if "mean_difference" in pair:
+                                    summary += f"    Mean difference: {pair['mean_difference']:.2f}\n"
+                    
+                    summary += "\n"
+            
+            # Add group statistics summary if available
+            if "group_statistics" in statistical_report and "Mode" in statistical_report["group_statistics"]:
+                mode_stats = statistical_report["group_statistics"]["Mode"]
+                summary += "## Statistics by Mode\n\n"
+                print(f"[DEBUG] Processing group statistics for Mode with columns: {list(mode_stats.keys())}")
+                
+                for column, modes in mode_stats.items():
+                    summary += f"### {column} by Mode\n"
+                    for mode, stats in modes.items():
+                        summary += f"- {mode}:\n"
+                        summary += f"  - Mean: {stats.get('mean', 'N/A'):.2f}\n"
+                        summary += f"  - Count: {stats.get('count', 'N/A')}\n"
+                        if 'ci_95_low' in stats and 'ci_95_high' in stats:
+                            summary += f"  - 95% CI: ({stats['ci_95_low']:.2f}, {stats['ci_95_high']:.2f})\n"
+                    
+                    summary += "\n"
+        except Exception as e:
+            print(f"Error generating statistical summary: {e}")
+            print(traceback.format_exc())
+            summary += f"Error generating statistical summary: {e}\n"
+            summary += "Full statistical report saved to JSON file.\n"
+        
+        print(f"--- Advanced Statistical Analysis Summary ---\n{summary}\n---------------------------------")
+        
+        # Store the summary in the context
+        await ctx.set("statistical_summary", summary)
+        
+        # Generate advanced plots using the PandasHelper
+        print("[DEBUG] Generating advanced visualizations...")
+        advanced_plot_paths = await pandas_helper.generate_advanced_plots(output_dir="plots/advanced")
+        
+        if advanced_plot_paths:
+            print(f"[DEBUG] Generated {len(advanced_plot_paths)} advanced plots")
+            plot_info = "Advanced visualizations generated:\n"
+            for path in advanced_plot_paths:
+                if isinstance(path, str) and not path.startswith("Error"):
+                    plot_info += f"- {path}\n"
+                    print(f"[DEBUG] Generated advanced plot: {path}")
+            
+            print(f"--- Advanced Visualization Info ---\n{plot_info}\n---------------------------------")
+            await ctx.set("advanced_plot_info", plot_info)
+        else:
+            print("[DEBUG] No advanced plots were generated or an error occurred")
+        
+        # Prepare path for modified file (same as in analysis_reporting step)
+        path_parts = os.path.splitext(original_path)
+        modified_file_path = f"{path_parts[0]}_modified{path_parts[1]}"
+        print(f"[DEBUG] Modified file path: {modified_file_path}")
+        
+        print("[DEBUG] Completed advanced statistical analysis step")
+        return AdvancedAnalysisCompleteEvent(
+            modified_data_path=modified_file_path,
+            report=summary,
+            statistical_report_path=statistical_report_path
+        )
+
+    @step
+    async def analysis_reporting(self, ctx: Context, ev: AdvancedAnalysisCompleteEvent) -> VisualizationRequestEvent:
+        """Performs analysis on the modified data, generates a report, and saves.""" 
         print("--- Running Analysis & Reporting Step ---")
         df: pd.DataFrame = await ctx.get("dataframe") 
-        original_path: str = ev.original_path 
+        original_path: str = ev.modified_data_path
+        statistical_summary = ev.report
+        statistical_report_path = ev.statistical_report_path
 
         print("Analysis & Reporting: Creating new Query Engine with modified DataFrame.")
         query_engine = PandasQueryEngine(df=df, llm=llm, verbose=True)
         pandas_helper = PandasHelper(df, query_engine) # Pass the new engine
-
 
         pandas_query_tool_local = FunctionTool.from_defaults(
              async_fn=pandas_helper.execute_pandas_query,
@@ -341,57 +490,68 @@ class DataAnalysisFlow(Workflow):
             llm=llm,
             verbose=True,
             system_prompt=(
-                "You are a data analysis and reporting agent. You work with an already modified DataFrame based on user decisions.\\n" # Added user decisions context
+                "You are a data analysis and reporting agent with advanced capabilities. You work with an already modified DataFrame based on user decisions.\\n"
                 "Your tasks are:\\n"
                 "1. Perform analysis queries on the current DataFrame using 'execute_pandas_query_tool'.\\n"
                 "2. Generate a concise Markdown report summarizing key findings from your analysis.\\n"
-                "3. Save the current DataFrame using the 'save_dataframe_tool'."
+                "3. Incorporate advanced statistical findings into your report, including skewness, kurtosis, confidence intervals, and significance tests.\\n"
+                "4. Save the current DataFrame using the 'save_dataframe_tool'."
             )
         )
 
         path_parts = os.path.splitext(original_path)
         modified_file_path = f"{path_parts[0]}_modified{path_parts[1]}"
 
+        # Get the modification summary from context
+        modification_summary = await ctx.get("modification_summary", "Modification summary not available.")
+
         analysis_request = (
-            f"The DataFrame (originally from {original_path}) has been modified based on prior user-approved cleaning steps.\\n" # Updated context
+            f"The DataFrame (originally from {original_path}) has been modified and comprehensive advanced statistical analysis has been performed.\\n\\n"
+            f"Data Cleaning Summary:\\n{modification_summary}\\n\\n"
+            f"Advanced Statistical Analysis Summary:\\n{statistical_summary}\\n\\n"
             f"Now, please perform the following actions:\\n"
-            f"1. Perform a brief analysis on the modified data. For example, check the description of the 'Time' column (df['Time'].describe()), the unique values in 'Mode' (df['Mode'].unique()), and the description of 'Distance' (df['Distance'].describe()). Use the 'execute_pandas_query_tool'.\\n"
-            f"2. Generate a Markdown report summarizing the key findings from your analysis of the modified data.\\n"
+            f"1. Perform additional analysis on the modified data as needed. For example, check the description of the 'Time' column (df['Time'].describe()), the unique values in 'Mode' (df['Mode'].unique()), and the description of 'Distance' (df['Distance'].describe()). Use the 'execute_pandas_query_tool'.\\n"
+            f"2. Generate a comprehensive Markdown report that includes:\\n"
+            f"   - A summary of the data preparation steps\\n"
+            f"   - Key findings from your analysis incorporating the advanced statistical measures (skewness, kurtosis, confidence intervals)\\n"
+            f"   - Interpretation of the significance tests between different modes of transport\\n"
+            f"   - Insights about the distribution of commute times and distances\\n"
             f"3. Save the current DataFrame to the following path using the 'save_dataframe_tool': '{modified_file_path}'"
         )
 
-        print(f"--- Prompting Analysis & Reporting Agent ---\\n{analysis_request}\\n------------------------------------")
+        print(f"--- Prompting Analysis & Reporting Agent ---\\n{analysis_request[:500]}...\\n------------------------------------")
 
-        
         agent_response = await analysis_reporting_agent.achat(analysis_request)
 
-        
         final_df = pandas_helper.get_final_dataframe() 
         await ctx.set("dataframe", final_df)
 
-       
         final_report = "Agent did not provide a valid report."
         if hasattr(agent_response, 'response') and agent_response.response:
              final_report = agent_response.response
-             
         else:
              print(f"Warning: Agent response might not be the expected report. Full result: {agent_response}")
              final_report = str(agent_response) 
 
-        print(f"--- Analysis & Reporting Agent Final Response (Report) ---\\n{final_report}\\n------------------------------------------")
+        print(f"--- Analysis & Reporting Agent Final Response (Report) ---\\n{final_report[:500]}...\\n------------------------------------------")
         await ctx.set("final_report", final_report)
+        
+        # Combine the report with information about the advanced plots
+        advanced_plot_info = await ctx.get("advanced_plot_info", "Advanced plot information not available.")
+        enhanced_report = final_report + "\n\n## Advanced Visualizations\n\n" + advanced_plot_info
+        
         return VisualizationRequestEvent(
             modified_data_path=modified_file_path,
-            report=final_report
+            report=enhanced_report
         )
-    
+
     @step
     async def create_visualizations(self, ctx: Context, ev: VisualizationRequestEvent) -> StopEvent:
-        """Generates visualizations for the cleaned data using a dedicated agent."""
-        print("--- Running Visualization Step ---")
+        """Generates standard and advanced visualizations for the cleaned data using a dedicated agent.""" 
+        print("--- Running Enhanced Visualization Step ---")
         df: pd.DataFrame = await ctx.get("dataframe")
         modified_data_path = ev.modified_data_path
-        final_report = ev.report # Report from previous step
+        final_report = ev.report # Enhanced report from previous step with advanced analysis
 
         if df is None:
             print("Error: DataFrame not found in context for visualization.")
@@ -399,66 +559,81 @@ class DataAnalysisFlow(Workflow):
             return StopEvent(result={"final_report": final_report, "visualization_info": "Error: DataFrame missing for visualization."})
 
         # Create a helper instance with the final DataFrame
-        query_engine = PandasQueryEngine(df=df, llm=llm, verbose=False) # LLM might not be strictly needed if only plotting
+        query_engine = PandasQueryEngine(df=df, llm=llm, verbose=False)
         pandas_helper = PandasHelper(df, query_engine)
 
-        # Create the visualization tool from the helper method
-        visualization_tool_local = FunctionTool.from_defaults(
-             async_fn=pandas_helper.generate_plots, # Use the new helper method
-             name="generate_visualizations_tool",
+        # Create the standard visualization tool
+        standard_visualization_tool = FunctionTool.from_defaults(
+             async_fn=pandas_helper.generate_plots,
+             name="generate_standard_visualizations_tool",
              description=pandas_helper.generate_plots.__doc__
         )
+        
+        # Create the advanced visualization tool
+        advanced_visualization_tool = FunctionTool.from_defaults(
+             async_fn=pandas_helper.generate_advanced_plots,
+             name="generate_advanced_visualizations_tool",
+             description="Generates advanced statistical plots including density plots, Q-Q plots, violin plots, correlation heatmaps, and pair plots."
+        )
 
-        # Create the visualization agent
+        # Create the visualization agent with both standard and advanced visualization tools
         visualization_agent = FunctionCallingAgent.from_tools(
-            tools=[visualization_tool_local],
-            llm=llm, # Ensure llm is accessible
+            tools=[standard_visualization_tool, advanced_visualization_tool],
+            llm=llm,
             verbose=True,
             system_prompt=(
-                "You are a data visualization agent. Your task is to generate insightful plots "
-                "for the provided dataset using the 'generate_visualizations_tool'. "
-                "The tool will generate standard plots (histogram, countplot, scatterplot, boxplot) "
-                "for 'Time', 'Mode', and 'Distance' columns and save them into a 'plots' directory. "
-                "Simply call the 'generate_visualizations_tool' function once to create all standard plots. "
-                "After calling the tool, confirm that the plots have been generated and mention the directory they were saved in ('plots')."
+                "You are an advanced data visualization agent with expertise in creating both standard and advanced visualizations. "
+                "Your task is to generate a comprehensive set of visualizations for the provided dataset using: \n"
+                "1. 'generate_standard_visualizations_tool' for creating standard plots (histogram, countplot, scatterplot, boxplot)\n"
+                "2. 'generate_advanced_visualizations_tool' for creating advanced plots (density plots, Q-Q plots, violin plots, correlation heatmaps, pair plots)\n"
+                "Call both tools to ensure a complete visualization suite. After calling the tools, confirm that the plots have been generated "
+                "and mention the directories they were saved in ('plots' for standard and 'plots/advanced' for advanced)."
             )
         )
 
         visualization_request = (
-            f"The data analysis report is complete. Now, generate standard visualizations "
-            f"for the cleaned data (referenced by path: {modified_data_path}) using the 'generate_visualizations_tool'. "
-            f"Focus on columns 'Time', 'Distance', and 'Mode'."
+            f"The data analysis report is complete. Now, generate both standard and advanced visualizations "
+            f"for the cleaned data (referenced by path: {modified_data_path}). To generate comprehensive visualizations:\n\n"
+            f"1. First, use the 'generate_standard_visualizations_tool' to create standard plots (histogram, countplot, scatterplot, boxplot)\n"
+            f"2. Then, use the 'generate_advanced_visualizations_tool' to create advanced statistical plots (density plots, Q-Q plots, violin plots, correlation heatmaps, pair plots)\n\n"
+            f"Focus on columns 'Time', 'Distance', and 'Mode'. Ensure both visualization tools are called."
         )
 
-        print(f"--- Prompting Visualization Agent ---\n{visualization_request}\n---------------------------------")
+        print(f"--- Prompting Enhanced Visualization Agent ---\n{visualization_request}\n---------------------------------")
 
         agent_response = await visualization_agent.achat(visualization_request)
 
-        # The tool execution happens within the agent's call. The tool prints saved paths.
-        # Get the agent's confirmation message.
+        # Get the agent's confirmation message
         viz_confirmation = "Visualization agent did not provide confirmation."
-        plot_paths = [] # Placeholder
+        standard_plot_paths = []
+        advanced_plot_paths = []
 
-        # Check if tool calls exist and extract results if possible (depends on LlamaIndex version/structure)
+        # Extract results from tool calls if available
         if hasattr(agent_response, 'tool_calls'):
-             for call in agent_response.tool_calls:
-                 if call.tool_name == "generate_visualizations_tool" and hasattr(call, 'result'):
-                     plot_paths = call.result # Assuming the result is the list of paths
-                     print(f"Tool returned plot paths: {plot_paths}")
-                     break # Assuming only one call needed
+            for call in agent_response.tool_calls:
+                if call.tool_name == "generate_standard_visualizations_tool" and hasattr(call, 'result'):
+                    standard_plot_paths = call.result
+                    print(f"Standard visualization tool returned plot paths: {standard_plot_paths}")
+                elif call.tool_name == "generate_advanced_visualizations_tool" and hasattr(call, 'result'):
+                    advanced_plot_paths = call.result
+                    print(f"Advanced visualization tool returned plot paths: {advanced_plot_paths}")
 
         if hasattr(agent_response, 'response') and agent_response.response:
-             viz_confirmation = agent_response.response
+            viz_confirmation = agent_response.response
         else:
-             print(f"Warning: Visualization agent response might not be the expected confirmation. Full result: {agent_response}")
-             viz_confirmation = str(agent_response) # Fallback
+            print(f"Warning: Visualization agent response might not be the expected confirmation. Full result: {agent_response}")
+            viz_confirmation = str(agent_response)
 
-        print(f"--- Visualization Agent Confirmation ---\n{viz_confirmation}\n------------------------------------")
+        print(f"--- Enhanced Visualization Agent Confirmation ---\n{viz_confirmation}\n------------------------------------")
 
-        # Include the report, confirmation, and potentially plot paths in the final result
+        # Combine standard and advanced plot paths
+        all_plot_paths = standard_plot_paths + advanced_plot_paths
+        
+        # Include the enhanced report, confirmation, and all plot paths in the final result
         final_result = {
             "final_report": final_report,
             "visualization_info": viz_confirmation,
-            "plot_paths": plot_paths if plot_paths else "Plot paths not retrieved from tool call."
+            "plot_paths": all_plot_paths if all_plot_paths else "Plot paths not retrieved from tool calls."
         }
+        
         return StopEvent(result=final_result)

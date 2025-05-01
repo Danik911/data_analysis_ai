@@ -1,0 +1,23 @@
+{
+  "dataset_info": {
+    "rows": 279,
+    "columns": 4,
+    "column_types": {
+      "Case": "int64",
+      "Mode": "object",
+      "Distance": "float64",
+      "Time": "float64"
+    }
+  },
+  "advanced_statistics": {
+    "Case": {
+      "mean": 141.69534050179212,
+      "median": 142.0,
+      "std": 81.13447191032807,
+      "skewness": -0.013498641605603856,
+      "kurtosis": -1.1901795750174278,
+      "ci_95_low": 132.13339582274915,
+      "ci_95_high": 151.25728518083508,
+      "shapiro_stat": 0.9554158827926342,
+      "shapiro_p_value": 1.5650224042029622e-07,
+      "is_normal": 
