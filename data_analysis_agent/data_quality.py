@@ -576,7 +576,7 @@ class DataQualityAssessment:
     
     def save_report(self, file_path: str) -> str:
         """
-        Saves the data quality report to a JSON file.
+        Saves the data quality report to a JSON file using atomic write operation.
         
         Args:
             file_path (str): Path to save the report
@@ -587,804 +587,584 @@ class DataQualityAssessment:
         report = self.generate_report()
         
         try:
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            # Import our utilities module with proper path handling
+            import sys
+            import os
+            module_path = os.path.abspath(os.path.dirname(__file__))
+            if module_path not in sys.path:
+                sys.path.append(module_path)
             
-            # Save as JSON
-            with open(file_path, 'w') as f:
-                json.dump(report, f, indent=2)
-                
-            return f"Data quality report saved to {file_path}"
+            from utils import save_json_atomic
+            
+            # Use atomic JSON saving to prevent corruption
+            success = save_json_atomic(report, file_path)
+            
+            if success:
+                return f"Data quality report saved to {file_path}"
+            else:
+                return f"Error saving data quality report to {file_path}"
         except Exception as e:
-            return f"Error saving report: {e}"
+            import traceback
+            error_msg = f"Error saving data quality report: {str(e)}"
+            print(error_msg)
+            traceback.print_exc()
+            return error_msg
 
 
 class DataCleaner:
     """
-    Class for cleaning and transforming data based on quality assessment results.
-    Includes functionality for standardizing values, handling missing data,
-    removing outliers, and tracking before/after metrics.
+    Class for comprehensive data cleaning, implementing the recommendations
+    from the data quality assessment.
     """
     
-    def __init__(self, df: pd.DataFrame, assessment_report: Dict[str, Any] = None):
+    def __init__(self, df: pd.DataFrame, assessment_report: Optional[Dict[str, Any]] = None):
         """
         Initialize with a pandas DataFrame and optionally an assessment report.
         
         Args:
             df (pd.DataFrame): The dataset to clean
-            assessment_report (Dict, optional): Data quality assessment report
+            assessment_report (Dict): Optional quality assessment report
         """
-        self.original_df = df.copy()
         self.df = df.copy()
+        self.original_df = df.copy()  # Keep a copy of the original data for before/after comparison
         self.assessment_report = assessment_report
         self.cleaning_log = []
-        self.before_metrics = self._calculate_metrics(self.original_df)
-        self.after_metrics = None
+        self.report = {}
         
-    def _calculate_metrics(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def standardize_mode_values(self) -> None:
         """
-        Calculate key metrics for the DataFrame to enable before/after comparison.
-        
-        Args:
-            df (pd.DataFrame): DataFrame to calculate metrics for
-            
-        Returns:
-            Dict: Metrics including row count, missing values, etc.
-        """
-        metrics = {
-            'row_count': len(df),
-            'column_count': len(df.columns),
-            'missing_value_counts': df.isna().sum().to_dict(),
-            'total_missing_values': df.isna().sum().sum(),
-            'unique_counts': {col: df[col].nunique() for col in df.columns},
-        }
-        
-        # Add descriptive statistics for numeric columns
-        numeric_cols = df.select_dtypes(include=['number']).columns
-        if len(numeric_cols) > 0:
-            metrics['numeric_stats'] = {}
-            for col in numeric_cols:
-                metrics['numeric_stats'][col] = {
-                    'mean': float(df[col].mean()) if not df[col].isna().all() else None,
-                    'median': float(df[col].median()) if not df[col].isna().all() else None,
-                    'std': float(df[col].std()) if not df[col].isna().all() else None,
-                    'min': float(df[col].min()) if not df[col].isna().all() else None,
-                    'max': float(df[col].max()) if not df[col].isna().all() else None
-                }
-        
-        # Mode value counts if 'Mode' column exists
-        if 'Mode' in df.columns:
-            metrics['mode_value_counts'] = df['Mode'].value_counts().to_dict()
-        
-        return metrics
-    
-    def log_cleaning_step(self, action: str, details: Dict[str, Any]) -> None:
-        """
-        Log a cleaning action for documentation.
-        
-        Args:
-            action (str): Description of the cleaning action
-            details (Dict): Details about the action (e.g., affected rows, columns)
-        """
-        self.cleaning_log.append({
-            'action': action,
-            'details': details,
-            'timestamp': pd.Timestamp.now().isoformat()
-        })
-    
-    def standardize_mode_values(self) -> pd.DataFrame:
-        """
-        Standardize Mode values using frequency analysis to identify and correct typos.
-        
-        Returns:
-            pd.DataFrame: DataFrame with standardized Mode values
+        Standardizes mode values according to valid mode categories.
         """
         if 'Mode' not in self.df.columns:
-            self.log_cleaning_step('standardize_mode_values', {
-                'status': 'skipped',
-                'reason': 'Mode column not found'
-            })
-            return self.df
+            return
+            
+        # Standard mode values we expect
+        valid_modes = {'Car', 'Bus', 'Cycle', 'Walk', 'Train', 'Tram', 'Subway'}
         
-        # Get current Mode values and their counts
-        mode_counts = self.df['Mode'].value_counts()
-        
-        # Define standardization mapping based on assessment if available
-        mode_mapping = {}
-        
-        if (self.assessment_report and 'impossible_values' in self.assessment_report and 
-            'Mode' in self.assessment_report['impossible_values']):
-            mode_info = self.assessment_report['impossible_values']['Mode']
-            mode_mapping = mode_info.get('likely_corrections', {})
-        else:
-            # Simple mapping based on common typos
-            mode_mapping = {
-                'Cra': 'Car',
-                'Wilk': 'Walk',
-                'Walt': 'Walk',
-                'Bas': 'Bus',
-                'Buss': 'Bus',
-                'Cyc': 'Cycle'
-            }
-        
-        # Apply standardization
+        # Track original values for the report
         original_values = self.df['Mode'].copy()
-        self.df['Mode'] = self.df['Mode'].replace(mode_mapping)
         
-        # Count changes
-        changes = (original_values != self.df['Mode']).sum()
+        # Count changes made
+        changes = 0
+        value_map = {}
         
-        # Log the action
-        self.log_cleaning_step('standardize_mode_values', {
-            'status': 'completed',
-            'changes': int(changes),
-            'mapping': mode_mapping,
-            'value_counts_before': original_values.value_counts().to_dict(),
-            'value_counts_after': self.df['Mode'].value_counts().to_dict()
-        })
-        
-        return self.df
-    
-    def handle_missing_values(self, strategy: Dict[str, str] = None) -> pd.DataFrame:
-        """
-        Handle missing values using specified strategies.
-        
-        Args:
-            strategy (Dict, optional): Mapping of column names to imputation strategies
-                (e.g., {'Time': 'median', 'Distance': 'mean'})
+        # Function to map invalid modes to valid ones based on first letter
+        def get_correction(invalid_mode):
+            if not isinstance(invalid_mode, str) or not invalid_mode:
+                return "Unknown"
                 
-        Returns:
-            pd.DataFrame: DataFrame with handled missing values
+            first_letter = invalid_mode[0].upper()
+            
+            for mode in valid_modes:
+                if mode.startswith(first_letter):
+                    return mode
+            
+            return "Unknown"
+        
+        # Apply corrections
+        for idx, value in enumerate(self.df['Mode']):
+            if value not in valid_modes:
+                corrected_value = get_correction(value)
+                self.df.at[idx, 'Mode'] = corrected_value
+                changes += 1
+                value_map[value] = corrected_value
+        
+        # Log the cleaning action
+        self.cleaning_log.append({
+            'action': 'standardize_mode_values',
+            'details': {
+                'changes': changes,
+                'value_map': value_map
+            }
+        })
+    
+    def handle_missing_values(self) -> None:
         """
-        if strategy is None:
-            # Default strategies based on data types
-            strategy = {}
-            numeric_cols = self.df.select_dtypes(include=['number']).columns
-            categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
-            
-            for col in numeric_cols:
-                strategy[col] = 'median'  # More robust to outliers than mean
-            
-            for col in categorical_cols:
-                strategy[col] = 'mode'
+        Handles missing values based on recommended strategies from the assessment.
+        """
+        # Track what was done to each column
+        strategies = {}
         
-        before_missing = self.df.isna().sum().to_dict()
-        imputation_details = {}
+        # Get columns with significant missing values if assessment is available
+        missing_significant = []
+        if self.assessment_report and 'recommendations' in self.assessment_report:
+            missing_value_recs = self.assessment_report['recommendations'].get('missing_values', [])
+            for rec in missing_value_recs:
+                if 'columns with significant missing values' in rec:
+                    # Extract column names from recommendation text
+                    start_idx = rec.find(':') + 1
+                    columns_str = rec[start_idx:].strip()
+                    missing_significant = [col.strip() for col in columns_str.split(',')]
+        else:
+            # If no assessment, find columns with > 5% missing values
+            for col in self.df.columns:
+                pct_missing = (self.df[col].isna().sum() / len(self.df)) * 100
+                if pct_missing > 5:
+                    missing_significant.append(col)
         
-        for col, method in strategy.items():
-            if col not in self.df.columns:
+        # Handle missing values by column
+        for col in self.df.columns:
+            missing_count = self.df[col].isna().sum()
+            if missing_count == 0:
                 continue
                 
-            if method == 'mean':
-                fill_value = self.df[col].mean()
-                self.df[col] = self.df[col].fillna(fill_value)
-                imputation_details[col] = {'method': 'mean', 'value': float(fill_value)}
-                
-            elif method == 'median':
-                fill_value = self.df[col].median()
-                self.df[col] = self.df[col].fillna(fill_value)
-                imputation_details[col] = {'method': 'median', 'value': float(fill_value)}
-                
-            elif method == 'mode':
-                fill_value = self.df[col].mode()[0]
-                self.df[col] = self.df[col].fillna(fill_value)
-                imputation_details[col] = {'method': 'mode', 'value': fill_value}
-                
-            elif method == 'zero':
-                self.df[col] = self.df[col].fillna(0)
-                imputation_details[col] = {'method': 'zero', 'value': 0}
-                
-            elif method == 'drop':
-                self.df = self.df.dropna(subset=[col])
-                imputation_details[col] = {'method': 'drop', 'rows_removed': before_missing[col]}
+            # Choose strategy based on column type and domain knowledge
+            if col in ['Distance', 'Time']:
+                # For numeric columns, use median imputation
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+                strategies[col] = {'strategy': 'median_imputation', 'value': float(median_val)}
+            
+            elif col == 'Mode':
+                # For Mode, use most common value
+                mode_val = self.df[col].mode()[0]
+                self.df[col].fillna(mode_val, inplace=True)
+                strategies[col] = {'strategy': 'mode_imputation', 'value': mode_val}
+            
+            else:
+                # For other columns, use most common value
+                mode_val = self.df[col].mode()[0] if not self.df[col].empty else "Unknown"
+                self.df[col].fillna(mode_val, inplace=True)
+                strategies[col] = {'strategy': 'mode_imputation', 'value': mode_val}
         
-        after_missing = self.df.isna().sum().to_dict()
-        
-        # Log the action
-        self.log_cleaning_step('handle_missing_values', {
-            'status': 'completed',
-            'strategies': strategy,
-            'missing_before': before_missing,
-            'missing_after': after_missing,
-            'imputation_details': imputation_details
+        # Log the cleaning action
+        self.cleaning_log.append({
+            'action': 'handle_missing_values',
+            'details': {
+                'strategies': strategies
+            }
         })
-        
-        return self.df
     
-    def handle_outliers(self, method: str = 'tukey', columns: List[str] = None) -> pd.DataFrame:
+    def handle_outliers(self, method='cap') -> None:
         """
-        Handle outliers using specified method.
+        Handles outliers in numeric columns using specified method.
         
         Args:
-            method (str): Method to use ('tukey', 'zscore', 'cap', or 'drop')
-            columns (List[str], optional): Columns to process. If None, use all numeric columns.
-                
-        Returns:
-            pd.DataFrame: DataFrame with handled outliers
+            method (str): Method to use ('cap' or 'remove')
         """
-        if columns is None:
-            columns = self.df.select_dtypes(include=['number']).columns.tolist()
+        numeric_cols = self.df.select_dtypes(include=['number']).columns
+        columns_processed = []
         
-        outlier_details = {}
-        
-        for col in columns:
-            if col not in self.df.columns:
+        for col in numeric_cols:
+            # Skip ID columns or columns without outliers
+            if col.lower() in ['id', 'case', 'index']:
                 continue
                 
-            series = self.df[col].dropna()
+            # Get outlier information from assessment if available
+            outliers_info = {}
+            if self.assessment_report and 'outliers_tukey' in self.assessment_report:
+                outliers_info = self.assessment_report['outliers_tukey'].get(col, {})
             
-            if method == 'tukey':
-                # Tukey's method (1.5 * IQR)
+            # If no outlier information, calculate it
+            if not outliers_info:
+                series = self.df[col].dropna()
                 q1 = series.quantile(0.25)
                 q3 = series.quantile(0.75)
                 iqr = q3 - q1
                 lower_bound = q1 - 1.5 * iqr
                 upper_bound = q3 + 1.5 * iqr
-                
-                outlier_mask = (self.df[col] < lower_bound) | (self.df[col] > upper_bound)
-                outlier_count = outlier_mask.sum()
-                
-                if outlier_count > 0:
+            else:
+                lower_bound = outliers_info.get('lower_bound')
+                upper_bound = outliers_info.get('upper_bound')
+            
+            # Count outliers
+            outliers = ((self.df[col] < lower_bound) | (self.df[col] > upper_bound))
+            outlier_count = outliers.sum()
+            
+            if outlier_count > 0:
+                if method == 'cap':
+                    # Cap outliers at the bounds
                     self.df.loc[self.df[col] < lower_bound, col] = lower_bound
                     self.df.loc[self.df[col] > upper_bound, col] = upper_bound
-                
-                outlier_details[col] = {
-                    'method': 'tukey_capping',
-                    'lower_bound': float(lower_bound),
-                    'upper_bound': float(upper_bound),
-                    'outliers_capped': int(outlier_count)
-                }
-                
-            elif method == 'zscore':
-                # Z-score method (cap at 3 standard deviations)
-                mean = series.mean()
-                std = series.std()
-                lower_bound = mean - 3 * std
-                upper_bound = mean + 3 * std
-                
-                outlier_mask = (self.df[col] < lower_bound) | (self.df[col] > upper_bound)
-                outlier_count = outlier_mask.sum()
-                
-                if outlier_count > 0:
-                    self.df.loc[self.df[col] < lower_bound, col] = lower_bound
-                    self.df.loc[self.df[col] > upper_bound, col] = upper_bound
-                
-                outlier_details[col] = {
-                    'method': 'zscore_capping',
-                    'lower_bound': float(lower_bound),
-                    'upper_bound': float(upper_bound),
-                    'outliers_capped': int(outlier_count)
-                }
-                
-            elif method == 'cap':
-                # Simple percentile capping (e.g., at 1% and 99%)
-                lower_bound = series.quantile(0.01)
-                upper_bound = series.quantile(0.99)
-                
-                outlier_mask = (self.df[col] < lower_bound) | (self.df[col] > upper_bound)
-                outlier_count = outlier_mask.sum()
-                
-                if outlier_count > 0:
-                    self.df.loc[self.df[col] < lower_bound, col] = lower_bound
-                    self.df.loc[self.df[col] > upper_bound, col] = upper_bound
-                
-                outlier_details[col] = {
-                    'method': 'percentile_capping',
-                    'lower_bound': float(lower_bound),
-                    'upper_bound': float(upper_bound),
-                    'outliers_capped': int(outlier_count)
-                }
-                
-            elif method == 'drop':
-                # Drop outlier rows
-                if 'tukey' in self.assessment_report['outliers']:
-                    q1 = self.assessment_report['outliers']['tukey'][col]['q1']
-                    q3 = self.assessment_report['outliers']['tukey'][col]['q3']
-                    iqr = q3 - q1
-                    lower_bound = q1 - 1.5 * iqr
-                    upper_bound = q3 + 1.5 * iqr
-                else:
-                    q1 = series.quantile(0.25)
-                    q3 = series.quantile(0.75)
-                    iqr = q3 - q1
-                    lower_bound = q1 - 1.5 * iqr
-                    upper_bound = q3 + 1.5 * iqr
-                
-                outlier_mask = (self.df[col] < lower_bound) | (self.df[col] > upper_bound)
-                outlier_count = outlier_mask.sum()
-                
-                if outlier_count > 0:
-                    before_rows = len(self.df)
-                    self.df = self.df[~outlier_mask]
-                    after_rows = len(self.df)
-                
-                outlier_details[col] = {
-                    'method': 'outlier_removal',
-                    'lower_bound': float(lower_bound),
-                    'upper_bound': float(upper_bound),
-                    'rows_removed': int(outlier_count),
-                    'rows_before': before_rows,
-                    'rows_after': after_rows
-                }
+                    columns_processed.append(col)
+                elif method == 'remove':
+                    # Remove rows with outliers
+                    self.df = self.df[~outliers]
+                    columns_processed.append(col)
         
-        # Log the action
-        self.log_cleaning_step('handle_outliers', {
-            'status': 'completed',
-            'method': method,
-            'columns': columns,
-            'outlier_details': outlier_details
+        # Log the cleaning action
+        self.cleaning_log.append({
+            'action': 'handle_outliers',
+            'details': {
+                'method': method,
+                'columns': columns_processed
+            }
         })
-        
-        return self.df
     
-    def handle_duplicates(self, subset: List[str] = None, keep: str = 'first') -> pd.DataFrame:
+    def handle_duplicates(self, subset=None) -> None:
         """
-        Handle duplicate rows in the dataset.
+        Removes duplicate rows, optionally based on a subset of columns.
         
         Args:
-            subset (List[str], optional): Columns to consider. If None, use all columns.
-            keep (str): Which duplicates to keep ('first', 'last', or False for none)
-                
-        Returns:
-            pd.DataFrame: DataFrame with handled duplicates
+            subset (List[str]): Optional list of columns to consider for duplicates
         """
-        before_rows = len(self.df)
-        
-        if subset is None:
-            duplicates = self.df.duplicated(keep=keep)
+        # Count duplicates before removal
+        if subset:
+            duplicates = self.df.duplicated(subset=subset)
         else:
-            duplicates = self.df.duplicated(subset=subset, keep=keep)
-        
+            duplicates = self.df.duplicated()
+            
         duplicate_count = duplicates.sum()
         
         if duplicate_count > 0:
-            if keep is False:
-                self.df = self.df[~self.df.duplicated(subset=subset, keep=False)]
-            else:
-                self.df = self.df[~duplicates]
-        
-        after_rows = len(self.df)
-        
-        # Log the action
-        self.log_cleaning_step('handle_duplicates', {
-            'status': 'completed',
-            'subset': subset,
-            'keep': keep,
-            'duplicates_removed': duplicate_count,
-            'rows_before': before_rows,
-            'rows_after': after_rows
-        })
-        
-        return self.df
+            # Remove duplicates
+            self.df.drop_duplicates(subset=subset, keep='first', inplace=True)
+            
+            # Log the cleaning action
+            self.cleaning_log.append({
+                'action': 'handle_duplicates',
+                'details': {
+                    'duplicates_removed': int(duplicate_count),
+                    'subset': subset
+                }
+            })
     
-    def handle_impossible_values(self, constraints: Dict[str, Dict[str, Any]] = None) -> pd.DataFrame:
+    def handle_impossible_values(self) -> None:
         """
-        Handle impossible values based on domain constraints.
-        
-        Args:
-            constraints (Dict, optional): Mapping of column names to constraints
-                (e.g., {'Distance': {'min': 0, 'max': 50}})
-                
-        Returns:
-            pd.DataFrame: DataFrame with handled impossible values
+        Fixes impossible values based on domain constraints.
         """
-        if constraints is None:
-            # Default constraints based on domain knowledge
-            constraints = {
-                'Distance': {'min': 0, 'max': 50},  # Distances should be positive and reasonable
-                'Time': {'min': 0, 'max': 120}      # Time should be positive and reasonable
-            }
+        # Define domain-specific rules
+        constraints = {
+            'Distance': {'min': 0, 'max': 50},  # Distances should be positive and reasonable (e.g., < 50km)
+            'Time': {'min': 0, 'max': 120}      # Time should be positive and reasonable (e.g., < 120 minutes)
+        }
         
-        impossible_details = {}
+        constraints_applied = {}
         
-        for col, rules in constraints.items():
+        for col, limits in constraints.items():
             if col not in self.df.columns:
                 continue
                 
-            changes = 0
+            min_val = limits.get('min')
+            max_val = limits.get('max')
+            violations = 0
             
-            # Handle minimum constraint
-            if 'min' in rules:
-                min_val = rules['min']
-                too_small_mask = self.df[col] < min_val
-                too_small_count = too_small_mask.sum()
-                
-                if too_small_count > 0:
-                    self.df.loc[too_small_mask, col] = min_val
-                    changes += too_small_count
+            if min_val is not None:
+                too_small = self.df[col] < min_val
+                violations += too_small.sum()
+                if too_small.any():
+                    self.df.loc[too_small, col] = min_val
             
-            # Handle maximum constraint
-            if 'max' in rules:
-                max_val = rules['max']
-                too_large_mask = self.df[col] > max_val
-                too_large_count = too_large_mask.sum()
-                
-                if too_large_count > 0:
-                    self.df.loc[too_large_mask, col] = max_val
-                    changes += too_large_count
+            if max_val is not None:
+                too_large = self.df[col] > max_val
+                violations += too_large.sum()
+                if too_large.any():
+                    self.df.loc[too_large, col] = max_val
             
-            impossible_details[col] = {
-                'constraints': rules,
-                'values_modified': int(changes)
-            }
+            if violations > 0:
+                constraints_applied[col] = {'min': min_val, 'max': max_val, 'violations_fixed': int(violations)}
         
-        # Log the action
-        self.log_cleaning_step('handle_impossible_values', {
-            'status': 'completed',
-            'constraints': constraints,
-            'impossible_details': impossible_details
-        })
-        
-        return self.df
+        if constraints_applied:
+            # Log the cleaning action
+            self.cleaning_log.append({
+                'action': 'handle_impossible_values',
+                'details': {
+                    'constraints': constraints_applied
+                }
+            })
     
-    def apply_recommended_cleaning(self) -> pd.DataFrame:
+    def fix_data_types(self) -> None:
         """
-        Apply recommended cleaning actions based on the assessment report.
+        Converts columns to their appropriate data types based on assessment.
+        """
+        # Get type recommendations from assessment if available
+        type_conversions = {}
+        
+        if self.assessment_report and 'recommendations' in self.assessment_report:
+            type_recs = self.assessment_report['recommendations'].get('data_types', [])
+            for rec in type_recs:
+                if 'Convert' in rec:
+                    parts = rec.split("'")
+                    if len(parts) >= 3:
+                        col_name = parts[1]
+                        from_type = parts[3]
+                        to_type = parts[5]
+                        type_conversions[col_name] = {'from': from_type, 'to': to_type}
+        
+        # Apply conversions
+        for col, conversion in type_conversions.items():
+            if col not in self.df.columns:
+                continue
+                
+            to_type = conversion.get('to')
+            
+            try:
+                if to_type == 'int64':
+                    self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0).astype(int)
+                elif to_type == 'float64':
+                    self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                # Add more type conversions as needed
+            except Exception as e:
+                print(f"Error converting {col} to {to_type}: {str(e)}")
+        
+        if type_conversions:
+            # Log the cleaning action
+            self.cleaning_log.append({
+                'action': 'fix_data_types',
+                'details': {
+                    'conversions': type_conversions
+                }
+            })
+    
+    def clean(self) -> pd.DataFrame:
+        """
+        Performs a complete cleaning of the dataset.
         
         Returns:
-            pd.DataFrame: Cleaned DataFrame
+            pd.DataFrame: The cleaned DataFrame
         """
-        if not self.assessment_report:
-            return self.df
+        # 1. Fix data types first to ensure proper handling
+        self.fix_data_types()
         
-        # Apply cleaning steps based on recommendations
+        # 2. Handle duplicates
+        self.handle_duplicates()
         
-        # 1. Handle data types
-        # Skip for now as it's more complex and might require careful handling
-        
-        # 2. Standardize mode values
+        # 3. Standardize categorical values (e.g. Mode)
         self.standardize_mode_values()
         
-        # 3. Handle duplicates
-        if self.assessment_report['duplicates']['count'] > 0:
-            self.handle_duplicates(keep='first')
-        
-        if 'case_duplicates' in self.assessment_report and self.assessment_report['case_duplicates']['count'] > 0:
-            self.handle_duplicates(subset=['Case'], keep='first')
-        
-        # 4. Handle missing values
-        missing_significant = [col for col in self.df.columns 
-                               if self.assessment_report['missing_values']['column_details'][col]['is_significant']]
-        if missing_significant:
-            strategies = {col: 'median' if col in ['Distance', 'Time'] else 'mode' for col in missing_significant}
-            self.handle_missing_values(strategies)
-        
-        # 5. Handle impossible values
+        # 4. Handle impossible values
         self.handle_impossible_values()
         
-        # 6. Handle outliers
-        outlier_cols = [col for col, stats in self.assessment_report['outliers'].items() 
-                       if 'outlier_count' in stats and stats['outlier_count'] > 0]
-        if outlier_cols:
-            self.handle_outliers(method='tukey', columns=outlier_cols)
+        # 5. Handle outliers
+        self.handle_outliers(method='cap')
         
-        # Calculate final metrics
-        self.after_metrics = self._calculate_metrics(self.df)
+        # 6. Handle missing values last
+        self.handle_missing_values()
         
         return self.df
     
-    def get_before_after_comparison(self) -> Dict[str, Any]:
+    def generate_metrics_comparison(self) -> Dict[str, Any]:
         """
-        Generate a comparison of metrics before and after cleaning.
+        Generates before/after metrics for the cleaning process.
         
         Returns:
-            Dict: Comparison of before and after metrics
+            Dict: Metrics comparison
         """
-        if self.after_metrics is None:
-            self.after_metrics = self._calculate_metrics(self.df)
+        metrics = {}
         
-        # Calculate changes
-        changes = {
-            'row_count': {
-                'before': self.before_metrics['row_count'],
-                'after': self.after_metrics['row_count'],
-                'change': self.after_metrics['row_count'] - self.before_metrics['row_count'],
-                'percent_change': ((self.after_metrics['row_count'] - self.before_metrics['row_count']) / 
-                                   self.before_metrics['row_count'] * 100) if self.before_metrics['row_count'] > 0 else 0
-            },
-            'missing_values': {
-                'before': self.before_metrics['total_missing_values'],
-                'after': self.after_metrics['total_missing_values'],
-                'change': self.after_metrics['total_missing_values'] - self.before_metrics['total_missing_values'],
-                'percent_change': ((self.after_metrics['total_missing_values'] - self.before_metrics['total_missing_values']) / 
-                                   max(1, self.before_metrics['total_missing_values']) * 100)
-            },
-            'column_missing_values': {}
+        # Row count comparison
+        metrics['row_count'] = {
+            'before': len(self.original_df),
+            'after': len(self.df),
+            'change': len(self.df) - len(self.original_df)
         }
         
-        # Column-specific missing value changes
-        for col in self.before_metrics['missing_value_counts']:
-            if col in self.after_metrics['missing_value_counts']:
-                before = self.before_metrics['missing_value_counts'][col]
-                after = self.after_metrics['missing_value_counts'][col]
-                changes['column_missing_values'][col] = {
-                    'before': before,
-                    'after': after,
-                    'change': after - before,
-                    'percent_change': ((after - before) / max(1, before) * 100) if before > 0 else 0
-                }
+        # Missing values comparison
+        original_missing = self.original_df.isna().sum().sum()
+        new_missing = self.df.isna().sum().sum()
+        metrics['missing_values'] = {
+            'before': int(original_missing),
+            'after': int(new_missing),
+            'change': int(new_missing - original_missing)
+        }
         
-        # Numeric column statistic changes
-        if 'numeric_stats' in self.before_metrics:
-            changes['numeric_stats'] = {}
-            
-            for col in self.before_metrics['numeric_stats']:
-                if col in self.after_metrics.get('numeric_stats', {}):
-                    changes['numeric_stats'][col] = {}
-                    
-                    for stat in ['mean', 'median', 'std', 'min', 'max']:
-                        before = self.before_metrics['numeric_stats'][col].get(stat)
-                        after = self.after_metrics['numeric_stats'][col].get(stat)
-                        
-                        if before is not None and after is not None:
-                            changes['numeric_stats'][col][stat] = {
-                                'before': before,
-                                'after': after,
-                                'change': after - before,
-                                'percent_change': ((after - before) / abs(before) * 100) if before != 0 else 0
-                            }
+        # Statistics for numeric columns
+        metrics['numeric_stats'] = {}
+        numeric_cols = self.df.select_dtypes(include=['number']).columns
         
-        # Mode value changes
-        if 'mode_value_counts' in self.before_metrics and 'mode_value_counts' in self.after_metrics:
-            changes['mode_value_counts'] = {
-                'before': self.before_metrics['mode_value_counts'],
-                'after': self.after_metrics['mode_value_counts']
-            }
-            
-            # Combined set of all mode values (before and after)
-            all_modes = set(self.before_metrics['mode_value_counts'].keys()).union(
-                set(self.after_metrics['mode_value_counts'].keys())
-            )
-            
-            mode_changes = {}
-            for mode in all_modes:
-                before = self.before_metrics['mode_value_counts'].get(mode, 0)
-                after = self.after_metrics['mode_value_counts'].get(mode, 0)
+        for col in numeric_cols:
+            if col not in self.original_df.columns:
+                continue
                 
-                mode_changes[mode] = {
-                    'before': before,
-                    'after': after,
-                    'change': after - before,
-                    'percent_change': ((after - before) / max(1, before) * 100) if before > 0 else 0
-                }
+            col_metrics = {}
             
-            changes['mode_value_counts']['changes'] = mode_changes
-        
-        # Add cleaning log
-        comparison = {
-            'metrics_comparison': changes,
-            'cleaning_log': self.cleaning_log,
-            'summary': {
-                'cleaning_steps': len(self.cleaning_log),
-                'rows_removed': self.before_metrics['row_count'] - self.after_metrics['row_count'],
-                'missing_values_addressed': self.before_metrics['total_missing_values'] - self.after_metrics['total_missing_values']
+            # Mean comparison
+            original_mean = self.original_df[col].mean()
+            new_mean = self.df[col].mean()
+            col_metrics['mean'] = {
+                'before': float(original_mean),
+                'after': float(new_mean),
+                'change': float(new_mean - original_mean)
             }
+            
+            # Standard deviation comparison
+            original_std = self.original_df[col].std()
+            new_std = self.df[col].std()
+            col_metrics['std'] = {
+                'before': float(original_std),
+                'after': float(new_std),
+                'change': float(new_std - original_std)
+            }
+            
+            # Min/Max comparison
+            col_metrics['min'] = {
+                'before': float(self.original_df[col].min()),
+                'after': float(self.df[col].min())
+            }
+            col_metrics['max'] = {
+                'before': float(self.original_df[col].max()),
+                'after': float(self.df[col].max())
+            }
+            
+            metrics['numeric_stats'][col] = col_metrics
+        
+        return metrics
+    
+    def generate_cleaning_report(self) -> Dict[str, Any]:
+        """
+        Generates a comprehensive report of the cleaning process.
+        
+        Returns:
+            Dict: Cleaning report
+        """
+        metrics_comparison = self.generate_metrics_comparison()
+        
+        self.report = {
+            'cleaning_log': self.cleaning_log,
+            'metrics_comparison': metrics_comparison,
+            'original_rows': len(self.original_df),
+            'cleaned_rows': len(self.df),
+            'timestamp': pd.Timestamp.now().isoformat()
         }
         
-        return comparison
+        return self.report
     
-    def save_cleaning_report(self, file_path: str) -> str:
+    def save_report(self, file_path: str) -> bool:
         """
-        Saves the cleaning report to a JSON file.
+        Saves the cleaning report to a JSON file using atomic write operation.
         
         Args:
             file_path (str): Path to save the report
             
         Returns:
-            str: Success message
+            bool: True if successful, False otherwise
         """
-        comparison = self.get_before_after_comparison()
-        
-        try:
-            # Ensure directory exists
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        if not self.report:
+            self.generate_cleaning_report()
             
-            # Save as JSON
-            with open(file_path, 'w') as f:
-                json.dump(comparison, f, indent=2)
-                
-            return f"Cleaning report saved to {file_path}"
+        try:
+            # Import our utilities module with proper path handling
+            import sys
+            import os
+            module_path = os.path.abspath(os.path.dirname(__file__))
+            if module_path not in sys.path:
+                sys.path.append(module_path)
+            
+            from utils import save_json_atomic
+            
+            # Use atomic JSON saving to prevent corruption
+            success = save_json_atomic(self.report, file_path)
+            
+            return success
         except Exception as e:
-            return f"Error saving cleaning report: {e}"
+            import traceback
+            print(f"Error saving cleaning report: {str(e)}")
+            traceback.print_exc()
+            return False
     
-    def plot_before_after(self, output_dir: str = "plots", include_plots: List[str] = None) -> List[str]:
+    def generate_comparison_plots(self, plots_dir: str = 'plots/cleaning_comparisons') -> List[str]:
         """
-        Generate before/after comparison plots.
+        Generates before/after comparison plots for the cleaning process.
         
         Args:
-            output_dir (str): Directory to save plots
-            include_plots (List[str], optional): Specific plots to include
-                Options: 'missing', 'distribution', 'outliers', 'mode_counts'
-                
+            plots_dir (str): Directory to save the plots
+            
         Returns:
-            List[str]: Paths to saved plots
+            List[str]: Paths to the generated plots
         """
-        if include_plots is None:
-            include_plots = ['missing', 'distribution', 'outliers', 'mode_counts']
+        os.makedirs(plots_dir, exist_ok=True)
+        plot_paths = []
         
-        # Ensure output directory exists
-        os.makedirs(output_dir, exist_ok=True)
+        # Generate distplots for numerical columns
+        numeric_cols = self.df.select_dtypes(include=['number']).columns
         
-        saved_plots = []
-        
-        # 1. Missing values comparison
-        if 'missing' in include_plots:
-            cols_with_missing = [col for col in self.original_df.columns 
-                                if self.original_df[col].isna().sum() > 0]
-            
-            if cols_with_missing:
-                plt.figure(figsize=(10, 6))
+        for col in numeric_cols:
+            if col not in self.original_df.columns:
+                continue
                 
-                before_missing = [self.original_df[col].isna().sum() for col in cols_with_missing]
-                after_missing = [self.df[col].isna().sum() for col in cols_with_missing]
-                
-                x = np.arange(len(cols_with_missing))
-                width = 0.35
-                
-                plt.bar(x - width/2, before_missing, width, label='Before Cleaning')
-                plt.bar(x + width/2, after_missing, width, label='After Cleaning')
-                
-                plt.xlabel('Columns')
-                plt.ylabel('Missing Value Count')
-                plt.title('Missing Values Before and After Cleaning')
-                plt.xticks(x, cols_with_missing, rotation=45, ha='right')
-                plt.legend()
-                plt.tight_layout()
-                
-                missing_plot_path = os.path.join(output_dir, 'missing_values_comparison.png')
-                plt.savefig(missing_plot_path)
-                plt.close()
-                saved_plots.append(missing_plot_path)
-        
-        # 2. Distribution comparison for Time and Distance
-        if 'distribution' in include_plots:
-            numeric_cols = ['Time', 'Distance']
+            fig, ax = plt.subplots(figsize=(10, 6))
             
-            for col in numeric_cols:
-                if col in self.original_df.columns and col in self.df.columns:
-                    plt.figure(figsize=(12, 6))
-                    
-                    plt.subplot(1, 2, 1)
-                    sns.histplot(self.original_df[col].dropna(), kde=True)
-                    plt.title(f'{col} Distribution - Before')
-                    
-                    plt.subplot(1, 2, 2)
-                    sns.histplot(self.df[col].dropna(), kde=True)
-                    plt.title(f'{col} Distribution - After')
-                    
-                    plt.tight_layout()
-                    
-                    dist_plot_path = os.path.join(output_dir, f'{col.lower()}_distribution_comparison.png')
-                    plt.savefig(dist_plot_path)
-                    plt.close()
-                    saved_plots.append(dist_plot_path)
-        
-        # 3. Mode value counts comparison
-        if 'mode_counts' in include_plots and 'Mode' in self.original_df.columns:
-            plt.figure(figsize=(10, 6))
+            # Plot before histogram
+            sns.histplot(self.original_df[col].dropna(), 
+                         color='red', alpha=0.5, label='Before', ax=ax, kde=True)
             
-            # Get mode counts
-            before_modes = self.original_df['Mode'].value_counts().sort_index()
-            after_modes = self.df['Mode'].value_counts().sort_index()
+            # Plot after histogram
+            sns.histplot(self.df[col].dropna(), 
+                         color='blue', alpha=0.5, label='After', ax=ax, kde=True)
             
-            # Combine all unique modes
-            all_modes = sorted(set(before_modes.index) | set(after_modes.index))
+            ax.set_title(f'Before/After: {col} Distribution')
+            ax.legend()
             
-            # Create DataFrame for plotting
-            mode_counts = pd.DataFrame(index=all_modes, columns=['Before', 'After'])
+            # Save the plot
+            plot_path = os.path.join(plots_dir, f'{col}_comparison.png')
+            plt.savefig(plot_path)
+            plt.close(fig)
             
-            for mode in all_modes:
-                mode_counts.loc[mode, 'Before'] = before_modes.get(mode, 0)
-                mode_counts.loc[mode, 'After'] = after_modes.get(mode, 0)
+            plot_paths.append(plot_path)
             
-            # Plot
-            mode_counts.plot(kind='bar', figsize=(10, 6))
-            plt.xlabel('Mode')
-            plt.ylabel('Count')
-            plt.title('Mode Value Counts Before and After Cleaning')
+        # For Mode column, generate countplot
+        if 'Mode' in self.df.columns and 'Mode' in self.original_df.columns:
+            fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+            
+            # Plot before counts
+            sns.countplot(x='Mode', data=self.original_df, ax=axes[0])
+            axes[0].set_title('Mode Values: Before')
+            axes[0].tick_params(axis='x', rotation=45)
+            
+            # Plot after counts
+            sns.countplot(x='Mode', data=self.df, ax=axes[1])
+            axes[1].set_title('Mode Values: After')
+            axes[1].tick_params(axis='x', rotation=45)
+            
             plt.tight_layout()
             
-            mode_plot_path = os.path.join(output_dir, 'mode_counts_comparison.png')
-            plt.savefig(mode_plot_path)
-            plt.close()
-            saved_plots.append(mode_plot_path)
-        
-        # 4. Outlier comparison (boxplots)
-        if 'outliers' in include_plots:
-            numeric_cols = ['Time', 'Distance']
+            # Save the plot
+            plot_path = os.path.join(plots_dir, 'mode_comparison.png')
+            plt.savefig(plot_path)
+            plt.close(fig)
             
-            for col in numeric_cols:
-                if col in self.original_df.columns and col in self.df.columns:
-                    plt.figure(figsize=(12, 6))
-                    
-                    # Prepare data for plotting
-                    before_data = self.original_df[col].dropna()
-                    after_data = self.df[col].dropna()
-                    
-                    # Create DataFrame for boxplot
-                    combined_data = pd.DataFrame({
-                        'Value': pd.concat([before_data, after_data]),
-                        'Stage': ['Before'] * len(before_data) + ['After'] * len(after_data),
-                        'Column': [col] * (len(before_data) + len(after_data))
-                    })
-                    
-                    # Plot
-                    sns.boxplot(x='Column', y='Value', hue='Stage', data=combined_data)
-                    plt.title(f'{col} Outlier Comparison')
-                    plt.tight_layout()
-                    
-                    outlier_plot_path = os.path.join(output_dir, f'{col.lower()}_outlier_comparison.png')
-                    plt.savefig(outlier_plot_path)
-                    plt.close()
-                    saved_plots.append(outlier_plot_path)
-        
-        return saved_plots
+            plot_paths.append(plot_path)
+            
+        return plot_paths
 
 
-# Functions to easily use the classes
-
-def assess_data_quality(df: pd.DataFrame, save_report: bool = True, 
-                        report_path: str = 'reports/data_quality_report.json') -> Dict[str, Any]:
+def assess_data_quality(df: pd.DataFrame, save_report: bool = False, 
+                       report_path: str = 'reports/data_quality_report.json') -> Dict[str, Any]:
     """
-    Perform comprehensive data quality assessment on a DataFrame.
+    Performs comprehensive data quality assessment on a DataFrame.
     
     Args:
-        df (pd.DataFrame): The DataFrame to assess
+        df (pd.DataFrame): The dataset to assess
         save_report (bool): Whether to save the report to a file
-        report_path (str): Path to save the report (if save_report is True)
+        report_path (str): Path to save the report
         
     Returns:
         Dict: Data quality assessment report
     """
-    assessment = DataQualityAssessment(df)
-    
-    # Run all assessments
-    assessment.verify_data_types()
-    assessment.check_missing_values()
-    assessment.detect_outliers_tukey()
-    assessment.check_duplicates()
-    if 'Case' in df.columns:
-        assessment.check_duplicates(subset=['Case'])
-    assessment.identify_impossible_values()
-    assessment.check_distribution()
-    
-    # Generate report
-    report = assessment.generate_report()
+    assessor = DataQualityAssessment(df)
+    assessment_report = assessor.generate_report()
     
     if save_report:
-        assessment.save_report(report_path)
-    
-    return report
+        assessor.save_report(report_path)
+        
+    return assessment_report
 
-def clean_data(df: pd.DataFrame, assessment_report: Dict[str, Any] = None, 
-               save_report: bool = True, report_path: str = 'reports/cleaning_report.json',
-               generate_plots: bool = True, plots_dir: str = 'plots') -> Tuple[pd.DataFrame, Dict[str, Any]]:
+
+def clean_data(df: pd.DataFrame, assessment_report: Optional[Dict[str, Any]] = None, 
+              save_report: bool = False, report_path: str = 'reports/cleaning_report.json',
+              generate_plots: bool = False, plots_dir: str = 'plots/cleaning_comparisons') -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
-    Clean a DataFrame based on assessment results.
+    Performs comprehensive cleaning on a DataFrame based on quality assessment.
     
     Args:
-        df (pd.DataFrame): The DataFrame to clean
-        assessment_report (Dict, optional): Data quality assessment report
-        save_report (bool): Whether to save the cleaning report
-        report_path (str): Path to save the cleaning report
-        generate_plots (bool): Whether to generate before/after plots
-        plots_dir (str): Directory to save plots
+        df (pd.DataFrame): The dataset to clean
+        assessment_report (Dict): Optional quality assessment report
+        save_report (bool): Whether to save the cleaning report to a file
+        report_path (str): Path to save the report
+        generate_plots (bool): Whether to generate before/after comparison plots
+        plots_dir (str): Directory to save the plots
         
     Returns:
-        Tuple: (Cleaned DataFrame, Cleaning report)
+        Tuple[pd.DataFrame, Dict]: The cleaned DataFrame and cleaning report
     """
     cleaner = DataCleaner(df, assessment_report)
-    
-    # Apply recommended cleaning
-    cleaned_df = cleaner.apply_recommended_cleaning()
-    
-    # Generate comparison
-    comparison = cleaner.get_before_after_comparison()
-    
-    if save_report:
-        cleaner.save_cleaning_report(report_path)
+    cleaned_df = cleaner.clean()
+    cleaning_report = cleaner.generate_cleaning_report()
     
     if generate_plots:
-        cleaner.plot_before_after(output_dir=plots_dir)
+        cleaner.generate_comparison_plots(plots_dir)
     
-    return cleaned_df, comparison
+    if save_report:
+        cleaner.save_report(report_path)
+        
+    return cleaned_df, cleaning_report

@@ -2,144 +2,144 @@
   "full_dataset": {
     "model_type": "full_dataset",
     "metrics": {
-      "r": 0.6597157763885095,
-      "r_squared": 0.43522490561589355,
-      "adjusted_r_squared": 0.4331636826436889,
-      "rmse": 9.720058156051975,
-      "mae": 8.235298150572488
+      "r": 0.6543862622960215,
+      "r_squared": 0.4282213802817566,
+      "adjusted_r_squared": 0.4261719945479995,
+      "rmse": 9.805757363429915,
+      "mae": 8.268823034697574
     },
     "coefficients": {
-      "intercept": 1.7013375745773724,
-      "coefficient": 5.845856020109707,
-      "p_value": 7.383147712865546e-36,
+      "intercept": 1.7761965227630327,
+      "coefficient": 5.818028821356809,
+      "p_value": 9.866621212347917e-36,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        -0.9347368966609984,
-        4.337412045815743
+        -0.8720480801177557,
+        4.424441125643821
       ],
       "coefficient_ci": [
-        5.053857505418513,
-        6.637854534800901
+        5.0257288174559624,
+        6.610328825257656
       ]
     },
-    "formula": "Time = 1.70 + 5.85 * Distance"
+    "formula": "Time = 1.78 + 5.82 * Distance"
   },
   "mode_Car": {
     "model_type": "mode_Car",
     "mode": "Car",
-    "sample_size": 82,
+    "sample_size": 84,
     "metrics": {
-      "r": 0.9238380464435492,
-      "r_squared": 0.853476736056632,
-      "adjusted_r_squared": 0.8516451952573398,
-      "rmse": 2.2128569782578493,
-      "mae": 1.161940863349579
+      "r": 0.9230057784989832,
+      "r_squared": 0.8519396671425139,
+      "adjusted_r_squared": 0.8501340533271787,
+      "rmse": 2.225005428130028,
+      "mae": 1.1857085829764302
     },
     "coefficients": {
-      "intercept": 1.4348486856654024,
-      "coefficient": 3.6787301410502327,
-      "p_value": 4.1571987700371193e-35,
+      "intercept": 1.4719156475340154,
+      "coefficient": 3.6851878095487267,
+      "p_value": 9.238430513002328e-36,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        0.18475461280653338,
-        2.6849427585242713
+        0.22304460145586114,
+        2.72078669361217
       ],
       "coefficient_ci": [
-        3.3395914788504126,
-        4.017868803250052
+        3.3476892105610574,
+        4.022686408536396
       ]
     },
-    "formula": "Time = 1.43 + 3.68 * Distance"
+    "formula": "Time = 1.47 + 3.69 * Distance"
   },
   "mode_Bus": {
     "model_type": "mode_Bus",
     "mode": "Bus",
-    "sample_size": 76,
+    "sample_size": 77,
     "metrics": {
-      "r": 0.987050555344147,
-      "r_squared": 0.9742687988051887,
-      "adjusted_r_squared": 0.9739210798701237,
-      "rmse": 2.0995130770213737,
-      "mae": 1.7334210648955706
+      "r": 0.9872917197600858,
+      "r_squared": 0.9747449399068288,
+      "adjusted_r_squared": 0.9744082057722532,
+      "rmse": 2.0795948208570914,
+      "mae": 1.7006258863777968
     },
     "coefficients": {
-      "intercept": -2.3305311685564867,
-      "coefficient": 9.171843800524108,
-      "p_value": 1.440088178518512e-60,
+      "intercept": -2.425295983161232,
+      "coefficient": 9.21762783334685,
+      "p_value": 1.1387687703300854e-61,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        -3.5575975394199695,
-        -1.103464797693004
+        -3.640385844995018,
+        -1.210206121327446
       ],
       "coefficient_ci": [
-        8.826589391358578,
-        9.517098209689639
+        8.876333677989551,
+        9.558921988704148
       ]
     },
-    "formula": "Time = -2.33 + 9.17 * Distance"
+    "formula": "Time = -2.43 + 9.22 * Distance"
   },
   "mode_Cycle": {
     "model_type": "mode_Cycle",
     "mode": "Cycle",
-    "sample_size": 70,
+    "sample_size": 71,
     "metrics": {
-      "r": 0.9896593197417375,
-      "r_squared": 0.9794255691516789,
-      "adjusted_r_squared": 0.9791230039921448,
-      "rmse": 0.6507193084645635,
-      "mae": 0.49241912231128565
+      "r": 0.9878734819958856,
+      "r_squared": 0.9758940164306743,
+      "adjusted_r_squared": 0.9755446543499594,
+      "rmse": 0.707796144775983,
+      "mae": 0.5158388304317664
     },
     "coefficients": {
-      "intercept": 0.2563462314745371,
-      "coefficient": 3.7192203448474723,
-      "p_value": 4.381464149584827e-59,
+      "intercept": 0.3632165062255495,
+      "coefficient": 3.6662013062558505,
+      "p_value": 1.4770571002918317e-57,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        -0.12171979081322559,
-        0.6344122537622998
+        -0.0430781039290441,
+        0.7695111163801431
       ],
       "coefficient_ci": [
-        3.5887773926769904,
-        3.8496632970179543
+        3.5278179434125483,
+        3.8045846690991527
       ]
     },
-    "formula": "Time = 0.26 + 3.72 * Distance"
+    "formula": "Time = 0.36 + 3.67 * Distance"
   },
   "mode_Walk": {
     "model_type": "mode_Walk",
     "mode": "Walk",
-    "sample_size": 48,
+    "sample_size": 49,
     "metrics": {
-      "r": 0.9229719791652886,
-      "r_squared": 0.8518772743242903,
-      "adjusted_r_squared": 0.8486572150704705,
-      "rmse": 6.146485020796256,
-      "mae": 3.8121275365693936
+      "r": 0.9199883884214191,
+      "r_squared": 0.8463786348302391,
+      "adjusted_r_squared": 0.8431100951457762,
+      "rmse": 6.339571613594037,
+      "mae": 3.9729316039347116
     },
     "coefficients": {
-      "intercept": 6.6877734609509165,
-      "coefficient": 8.99769692669021,
-      "p_value": 1.0610885769954654e-20,
+      "intercept": 6.231744121172039,
+      "coefficient": 9.18147910898045,
+      "p_value": 9.545907496513974e-21,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        3.491899662831981,
-        9.883647259069852
+        2.947496763355142,
+        9.515991478988935
       ],
       "coefficient_ci": [
-        7.884182043322194,
-        10.111211810058226
+        8.033644942945099,
+        10.329313275015803
       ]
     },
-    "formula": "Time = 6.69 + 9.00 * Distance"
+    "formula": "Time = 6.23 + 9.18 * Distance"
   }
 }

@@ -1,10 +1,127 @@
 {
+  "cleaning_log": [
+    {
+      "action": "standardize_mode_values",
+      "details": {
+        "changes": 6,
+        "value_map": {
+          "Wilk": "Walk",
+          "Cur": "Cycle",
+          "Bas": "Bus",
+          "Cra": "Cycle",
+          "Walt": "Walk"
+        }
+      }
+    },
+    {
+      "action": "handle_impossible_values",
+      "details": {
+        "constraints": {
+          "Distance": {
+            "min": 0,
+            "max": 50,
+            "violations_fixed": 2
+          }
+        }
+      }
+    },
+    {
+      "action": "handle_outliers",
+      "details": {
+        "method": "cap",
+        "columns": [
+          "Distance",
+          "Time"
+        ]
+      }
+    },
+    {
+      "action": "handle_missing_values",
+      "details": {
+        "strategies": {
+          "Time": {
+            "strategy": "median_imputation",
+            "value": 16.0
+          }
+        }
+      }
+    }
+  ],
   "metrics_comparison": {
     "row_count": {
-      "before": 279,
-      "after": 279,
-      "change": 0,
-      "percent_change": 0.0
+      "before": 281,
+      "after": 281,
+      "change": 0
     },
     "missing_values": {
-      "before": 
+      "before": 3,
+      "after": 0,
+      "change": -3
+    },
+    "numeric_stats": {
+      "Case": {
+        "mean": {
+          "before": 140.97864768683274,
+          "after": 140.97864768683274,
+          "change": 0.0
+        },
+        "std": {
+          "before": 81.28771370627476,
+          "after": 81.28771370627476,
+          "change": 0.0
+        },
+        "min": {
+          "before": 1.0,
+          "after": 1.0
+        },
+        "max": {
+          "before": 281.0,
+          "after": 281.0
+        }
+      },
+      "Distance": {
+        "mean": {
+          "before": 3.6580071174377227,
+          "after": 3.009964412811388,
+          "change": -0.6480427046263348
+        },
+        "std": {
+          "before": 8.20603098858781,
+          "after": 1.4559570976363283,
+          "change": -6.750073890951483
+        },
+        "min": {
+          "before": 0.2,
+          "after": 0.2
+        },
+        "max": {
+          "before": 99.0,
+          "after": 7.95
+        }
+      },
+      "Time": {
+        "mean": {
+          "before": 19.62230215827338,
+          "after": 19.28825622775801,
+          "change": -0.3340459305153729
+        },
+        "std": {
+          "before": 13.720434801529716,
+          "after": 12.944648817941225,
+          "change": -0.7757859835884915
+        },
+        "min": {
+          "before": 2.0,
+          "after": 2.0
+        },
+        "max": {
+          "before": 57.0,
+          "after": 46.875
+        }
+      }
+    }
+  },
+  "original_rows": 281,
+  "cleaned_rows": 281,
+  "timestamp": "2025-05-02T11:29:05.408965"
+}

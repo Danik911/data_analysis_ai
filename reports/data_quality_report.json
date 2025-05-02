@@ -1,6 +1,6 @@
 {
   "dataset_info": {
-    "total_rows": 279,
+    "total_rows": 281,
     "total_columns": 4,
     "column_names": [
       "Case",
@@ -8,17 +8,17 @@
       "Distance",
       "Time"
     ],
-    "quality_score": 99.46236559139786
+    "quality_score": 94.48398576512456
   },
   "issue_summary": {
-    "total_rows": 279,
+    "total_rows": 281,
     "total_columns": 4,
     "missing_value_count": 3,
     "duplicate_row_count": 0,
-    "outlier_count": 0,
-    "impossible_value_count": 0,
-    "duplicate_case_count": 0,
-    "invalid_mode_count": 0
+    "outlier_count": 18,
+    "impossible_value_count": 2,
+    "duplicate_case_count": 2,
+    "invalid_mode_count": 6
   },
   "type_verification": {
     "Case": {
@@ -43,4 +43,245 @@
       "Case": {
         "count": 0,
         "percentage": 0.0,
-        "is_significant": 
+        "is_significant": "False"
+      },
+      "Mode": {
+        "count": 0,
+        "percentage": 0.0,
+        "is_significant": "False"
+      },
+      "Distance": {
+        "count": 0,
+        "percentage": 0.0,
+        "is_significant": "False"
+      },
+      "Time": {
+        "count": 3,
+        "percentage": 1.0676156583629894,
+        "is_significant": "False"
+      }
+    },
+    "total_missing_rows": 3,
+    "missing_patterns": {
+      "Time": 3
+    }
+  },
+  "duplicates": {
+    "count": 0,
+    "percentage": 0.0,
+    "indices": [],
+    "examples": []
+  },
+  "outliers": {
+    "Case": {
+      "q1": 71.0,
+      "q3": 211.0,
+      "iqr": 140.0,
+      "lower_bound": -139.0,
+      "upper_bound": 421.0,
+      "outlier_count": 0,
+      "outlier_percentage": 0.0,
+      "outlier_indices": [],
+      "outlier_values": [],
+      "z_score_outlier_count": 0,
+      "method_agreement_percentage": 0.0
+    },
+    "Distance": {
+      "q1": 1.7,
+      "q3": 4.2,
+      "iqr": 2.5,
+      "lower_bound": -2.05,
+      "upper_bound": 7.95,
+      "outlier_count": 2,
+      "outlier_percentage": 0.7117437722419928,
+      "outlier_indices": [
+        103,
+        195
+      ],
+      "outlier_values": [
+        99.0,
+        99.0
+      ],
+      "z_score_outlier_count": 2,
+      "method_agreement_percentage": 100.0
+    },
+    "Time": {
+      "q1": 10.0,
+      "q3": 24.75,
+      "iqr": 14.75,
+      "lower_bound": -12.125,
+      "upper_bound": 46.875,
+      "outlier_count": 16,
+      "outlier_percentage": 5.755395683453238,
+      "outlier_indices": [
+        38,
+        75,
+        79,
+        82,
+        86,
+        97,
+        127,
+        128,
+        149,
+        172
+      ],
+      "outlier_values": [
+        57.0,
+        47.0,
+        56.0,
+        47.0,
+        52.0,
+        57.0,
+        56.0,
+        47.0,
+        50.0,
+        47.0
+      ],
+      "z_score_outlier_count": 0,
+      "method_agreement_percentage": 0.0
+    }
+  },
+  "impossible_values": {
+    "Distance": {
+      "min_constraint": 0,
+      "max_constraint": 50,
+      "total_violations": 2,
+      "too_small_count": 0,
+      "too_small_indices": [],
+      "too_small_values": [],
+      "too_large_count": 2,
+      "too_large_indices": [
+        103,
+        195
+      ],
+      "too_large_values": [
+        99.0,
+        99.0
+      ]
+    },
+    "Time": {
+      "min_constraint": 0,
+      "max_constraint": 120,
+      "total_violations": 0,
+      "too_small_count": 0,
+      "too_small_indices": [],
+      "too_small_values": [],
+      "too_large_count": 0,
+      "too_large_indices": [],
+      "too_large_values": []
+    },
+    "Mode": {
+      "valid_values": [
+        "Bus",
+        "Cycle",
+        "Subway",
+        "Car",
+        "Tram",
+        "Train",
+        "Walk"
+      ],
+      "invalid_values": [
+        "Wilk",
+        "Cur",
+        "Bas",
+        "Cra",
+        "Walt"
+      ],
+      "invalid_count": 6,
+      "invalid_indices": [
+        18,
+        26,
+        70,
+        132,
+        170,
+        276
+      ],
+      "likely_corrections": {
+        "Wilk": "Walk",
+        "Cur": "Cycle",
+        "Bas": "Bus",
+        "Cra": "Cycle",
+        "Walt": "Walk"
+      }
+    }
+  },
+  "distribution_stats": {
+    "Case": {
+      "mean": 140.97864768683274,
+      "median": 141.0,
+      "std": 81.28771370627476,
+      "min": 1.0,
+      "max": 281.0,
+      "skewness": -0.0003603618674477993,
+      "kurtosis": -1.2004458373735958,
+      "shapiro_p_value": 1.1306893301224827e-07,
+      "is_normal": "False",
+      "is_skewed": "False",
+      "skew_direction": "left"
+    },
+    "Distance": {
+      "mean": 3.6580071174377227,
+      "median": 3.0,
+      "std": 8.20603098858781,
+      "min": 0.2,
+      "max": 99.0,
+      "skewness": 11.275150588130993,
+      "kurtosis": 129.94938908052242,
+      "shapiro_p_value": 1.6241533478725255e-33,
+      "is_normal": "False",
+      "is_skewed": "True",
+      "skew_direction": "right"
+    },
+    "Time": {
+      "mean": 19.62230215827338,
+      "median": 16.0,
+      "std": 13.720434801529716,
+      "min": 2.0,
+      "max": 57.0,
+      "skewness": 1.0463374533421346,
+      "kurtosis": 0.15089541004566653,
+      "shapiro_p_value": 7.20528419407844e-14,
+      "is_normal": "False",
+      "is_skewed": "True",
+      "skew_direction": "right"
+    }
+  },
+  "recommendations": {
+    "missing_values": [],
+    "duplicates": [
+      "Investigate and resolve 2 duplicate Case numbers"
+    ],
+    "outliers": [
+      "Review outliers in columns: Distance, Time",
+      "For 'Distance' outliers, consider capping at 3 standard deviations from the mean",
+      "For 'Time' outliers, consider domain-specific rules (e.g., cap at 120 minutes)"
+    ],
+    "impossible_values": [
+      "Replace 2 impossible values in 'Distance' with appropriate bounds",
+      "Standardize 6 invalid Mode values using the suggested corrections"
+    ],
+    "data_types": []
+  },
+  "case_duplicates": {
+    "count": 2,
+    "percentage": 0.7117437722419928,
+    "indices": [
+      41,
+      45
+    ],
+    "examples": [
+      {
+        "Case": 41,
+        "Mode": "Car",
+        "Distance": 5.2,
+        "Time": 22.0
+      },
+      {
+        "Case": 41,
+        "Mode": "Bus",
+        "Distance": 4.0,
+        "Time": 36.0
+      }
+    ]
+  }
+}

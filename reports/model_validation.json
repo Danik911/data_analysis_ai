@@ -1,0 +1,73 @@
+{
+  "cross_validation": {
+    "model_name": "Time-Distance Regression",
+    "k_folds": 5,
+    "metrics": {
+      "r2_mean": 0.4068206058045911,
+      "r2_std": 0.09869759829630992,
+      "rmse_mean": 9.81996223848919,
+      "rmse_std": 0.738017828969218,
+      "mae_mean": 8.316917521766348,
+      "mae_std": 0.47552114192412653
+    },
+    "fold_results": [
+      {
+        "fold": 1,
+        "r2": 0.41923545987068367,
+        "rmse": 10.70314190911954,
+        "mae": 8.836643729928655
+      },
+      {
+        "fold": 2,
+        "r2": 0.5344382882060489,
+        "rmse": 9.506137127131648,
+        "mae": 7.7188814592571715
+      },
+      {
+        "fold": 3,
+        "r2": 0.3873808130965021,
+        "rmse": 8.942899088466847,
+        "mae": 7.829373670897224
+      },
+      {
+        "fold": 4,
+        "r2": 0.23558175418863392,
+        "rmse": 10.690851048622918,
+        "mae": 8.829022366553184
+      },
+      {
+        "fold": 5,
+        "r2": 0.4574667136610868,
+        "rmse": 9.256782019104996,
+        "mae": 8.370666382195505
+      }
+    ]
+  },
+  "residual_analysis": {
+    "normality_tests": {
+      "shapiro": {
+        "statistic": 0.9140684267743425,
+        "p_value": 1.3019104624200811e-11,
+        "is_normal": false
+      },
+      "anderson_darling": {
+        "statistic": 9.234310800154788,
+        "critical_value_5pct": 0.776,
+        "is_normal": false
+      }
+    },
+    "homoscedasticity_test": {
+      "breusch_pagan": {
+        "statistic": 62.87205243816845,
+        "p_value": 2.205800306473887e-15,
+        "is_homoscedastic": false
+      }
+    },
+    "residuals_stats": {
+      "mean": -5.562968037979432e-15,
+      "std": 9.770799115386241,
+      "skewness": 0.6086375799084075,
+      "kurtosis": -0.17263902922627716
+    }
+  }
+}
