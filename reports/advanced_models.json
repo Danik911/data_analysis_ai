@@ -1,0 +1,232 @@
+{
+  "polynomial_models": {
+    "1": {
+      "degree": 1,
+      "formula": "Time = 2.1814 + 5.6198*Distance",
+      "coefficients": [
+        2.1813959081806473,
+        5.619775485921187
+      ],
+      "metrics": {
+        "r2": 0.5235661271608121,
+        "rmse": 9.327260985651785,
+        "mae": 8.112388844252795,
+        "aic": 1631.8222995441934,
+        "bic": 1638.609554636898
+      },
+      "model_type": "polynomial",
+      "statsmodels_summary": "                            OLS Regression Results                            \n==============================================================================\nDep. Variable:                   Time   R-squared:                       0.409\nModel:                            OLS   Adj. R-squared:                  0.406\nMethod:                 Least Squares   F-statistic:                     150.7\nDate:                Fri, 02 May 2025   Prob (F-statistic):           1.13e-26\nTime:                        09:11:25   Log-Likelihood:                -813.91\nNo. Observations:                 220   AIC:                             1632.\nDf Residuals:                     218   BIC:                             1639.\nDf Model:                           1                                         \nCovariance Type:            nonrobust                                         \n==============================================================================\n                 coef    std err          t      P>|t|      [0.025      0.975]\n------------------------------------------------------------------------------\nconst          2.1814      1.533      1.423      0.156      -0.839       5.202\nDistance       5.6198      0.458     12.274      0.000       4.717       6.522\n==============================================================================\nOmnibus:                       14.595   Durbin-Watson:                   1.956\nProb(Omnibus):                  0.001   Jarque-Bera (JB):               16.239\nSkew:                           0.665   Prob(JB):                     0.000298\nKurtosis:                       2.936   Cond. No.                         8.31\n==============================================================================\n\nNotes:\n[1] Standard Errors assume that the covariance matrix of the errors is correctly specified."
+    },
+    "2": {
+      "degree": 2,
+      "formula": "Time = -1.8381 + 8.8270*Distance + -0.5053*Distance^2",
+      "coefficients": [
+        0.0,
+        8.827046252612407,
+        -0.5052528644400818
+      ],
+      "intercept": -1.8380835138532383,
+      "metrics": {
+        "r2": 0.51634327496134,
+        "rmse": 9.397696794779039,
+        "mae": 8.094761986029727,
+        "aic": 1629.1510996214415,
+        "bic": 1639.3319822604985
+      },
+      "model_type": "polynomial",
+      "feature_names": [
+        "1",
+        "Distance",
+        "Distance^2"
+      ]
+    },
+    "3": {
+      "degree": 3,
+      "formula": "Time = 3.6181 + 1.9054*Distance + 1.6871*Distance^2 + -0.1938*Distance^3",
+      "coefficients": [
+        0.0,
+        1.9054037763518579,
+        1.6870726078334068,
+        -0.1937606596943966
+      ],
+      "intercept": 3.618110754179373,
+      "metrics": {
+        "r2": 0.5231909166831644,
+        "rmse": 9.330933055885465,
+        "mae": 8.071103491833926,
+        "aic": 1626.6616285854595,
+        "bic": 1640.236138770869
+      },
+      "model_type": "polynomial",
+      "feature_names": [
+        "1",
+        "Distance",
+        "Distance^2",
+        "Distance^3"
+      ]
+    },
+    "4": {
+      "degree": 4,
+      "formula": "Time = 5.9093 + -2.7569*Distance + 4.2845*Distance^2 + -0.7172*Distance^3 + 0.0337*Distance^4",
+      "coefficients": [
+        0.0,
+        -2.7569167795011493,
+        4.2845309500588975,
+        -0.7171587561027144,
+        0.033684380192350094
+      ],
+      "intercept": 5.909287523404469,
+      "metrics": {
+        "r2": 0.5143314813358049,
+        "rmse": 9.417221600255788,
+        "mae": 8.100730387480985,
+        "aic": 1628.2587205897496,
+        "bic": 1645.2268583215114
+      },
+      "model_type": "polynomial",
+      "feature_names": [
+        "1",
+        "Distance",
+        "Distance^2",
+        "Distance^3",
+        "Distance^4"
+      ]
+    },
+    "best_model": {
+      "degree": 3,
+      "selection_criterion": "AIC",
+      "metrics": {
+        "r2": 0.5231909166831644,
+        "rmse": 9.330933055885465,
+        "mae": 8.071103491833926,
+        "aic": 1626.6616285854595,
+        "bic": 1640.236138770869
+      }
+    }
+  },
+  "log_transformation_models": {
+    "linear": {
+      "transformation": "linear",
+      "formula_type": "y ~ x",
+      "detailed_formula": "Time = 2.1814 + 5.6198*Distance",
+      "coefficients": [
+        2.1813959081806473,
+        5.619775485921187
+      ],
+      "metrics": {
+        "r2": 0.5235661271608121,
+        "rmse": 9.327260985651785,
+        "mae": 8.112388844252795,
+        "aic": 1631.8222995441934,
+        "bic": 1638.609554636898
+      },
+      "model_type": "log_transformation"
+    },
+    "log_x": {
+      "transformation": "log_x",
+      "formula_type": "y ~ log(x)",
+      "detailed_formula": "Time = 7.8899 + 11.9217*log(Distance)",
+      "coefficients": [
+        7.889875521764958,
+        11.921672527958595
+      ],
+      "metrics": {
+        "r2": 0.4678278783378266,
+        "rmse": 9.857774367526744,
+        "mae": 8.495666004527246,
+        "aic": 1647.3060517214174,
+        "bic": 1654.0933068141221
+      },
+      "model_type": "log_transformation"
+    },
+    "log_y": {
+      "transformation": "log_y",
+      "formula_type": "log(y) ~ x",
+      "detailed_formula": "log(Time) = 1.6335 + 0.3592*Distance\nTime = exp(1.6335 + 0.3592*Distance)",
+      "coefficients": [
+        1.633451869113578,
+        0.359232845433317
+      ],
+      "metrics": {
+        "r2": 0.5855006189178562,
+        "rmse": 0.49961018237941984,
+        "mae": 0.4470150422882338,
+        "aic": 320.86116699668906,
+        "bic": 327.64842208939376
+      },
+      "model_type": "log_transformation"
+    },
+    "log_log": {
+      "transformation": "log_log",
+      "formula_type": "log(y) ~ log(x)",
+      "detailed_formula": "log(Time) = 1.9314 + 0.8330*log(Distance)\nTime = exp(1.9314)*Distance^0.8330",
+      "coefficients": [
+        1.931417057068626,
+        0.8329681448933357
+      ],
+      "metrics": {
+        "r2": 0.6058122864765434,
+        "rmse": 0.4872152569361681,
+        "mae": 0.4556092331995231,
+        "aic": 303.69082558985286,
+        "bic": 310.47808068255756
+      },
+      "model_type": "log_transformation"
+    },
+    "best_model": {
+      "transformation": "log_log",
+      "selection_criterion": "AIC",
+      "metrics": {
+        "r2": 0.6058122864765434,
+        "rmse": 0.4872152569361681,
+        "mae": 0.4556092331995231,
+        "aic": 303.69082558985286,
+        "bic": 310.47808068255756
+      }
+    }
+  },
+  "model_comparison": {
+    "linear_model": {
+      "name": "Linear Regression",
+      "metrics": {
+        "r2": 0.5235661271608121,
+        "rmse": 9.327260985651785,
+        "mae": 8.112388844252795,
+        "aic": 1631.8222995441934,
+        "bic": 1638.609554636898
+      },
+      "formula": "Time = 2.1814 + 5.6198*Distance"
+    },
+    "best_polynomial": {
+      "name": "Polynomial (degree=3)",
+      "metrics": {
+        "r2": 0.5231909166831644,
+        "rmse": 9.330933055885465,
+        "mae": 8.071103491833926,
+        "aic": 1626.6616285854595,
+        "bic": 1640.236138770869
+      },
+      "formula": "Time = 3.6181 + 1.9054*Distance + 1.6871*Distance^2 + -0.1938*Distance^3",
+      "degree": 3
+    },
+    "best_log_transform": {
+      "name": "Log Transformation (log_log)",
+      "metrics": {
+        "r2": 0.6058122864765434,
+        "rmse": 0.4872152569361681,
+        "mae": 0.4556092331995231,
+        "aic": 303.69082558985286,
+        "bic": 310.47808068255756
+      },
+      "formula": "log(Time) = 1.9314 + 0.8330*log(Distance)\nTime = exp(1.9314)*Distance^0.8330",
+      "transformation": "log_log"
+    },
+    "overall_best_model": "best_log_transform",
+    "selection_criterion": "AIC",
+    "plot_paths": [
+      "plots/models\\model_comparison.png",
+      "plots/models\\model_selection_criteria.png"
+    ]
+  },
+  "status": "success"
+}

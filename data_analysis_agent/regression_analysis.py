@@ -449,8 +449,8 @@ class RegressionModel:
                 return float(item)
             elif isinstance(item, np.int64) or isinstance(item, np.int32):
                 return int(item)
-            elif isinstance(item, bool):  # Add explicit handling for boolean values
-                return bool(item)
+            elif isinstance(item, bool):  # Handle boolean values properly
+                return item  # Return as-is, native JSON boolean
             else:
                 return item
         

@@ -35,7 +35,7 @@ class UtilsManager:
         if isinstance(obj, (str, int, float, type(None))):
             return obj
         elif isinstance(obj, bool):
-            return str(obj)  # Convert boolean to string
+            return obj  # Return boolean as-is for proper JSON serialization
         elif isinstance(obj, (list, tuple)):
             return [UtilsManager.make_json_serializable(item) for item in obj]
         elif isinstance(obj, dict):
