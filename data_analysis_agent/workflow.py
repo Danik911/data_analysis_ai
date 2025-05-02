@@ -39,6 +39,19 @@ class RegressionCompleteEvent(Event):
     regression_summary: str
     model_quality: str
 
+class VisualizationCompleteEvent(Event):
+    """Event triggered when visualization is complete"""
+    final_report: str
+    visualization_info: str
+    plot_paths: list
+
+class FinalizeReportsEvent(Event):
+    """Event triggered to finalize all reports"""
+    final_report: str
+    visualization_info: str
+    plot_paths: list
+    reports_to_verify: list
+
 
 class DataAnalysisFlow(Workflow):
     
@@ -115,6 +128,15 @@ class DataAnalysisFlow(Workflow):
             
             # Combine quality assessment with basic stats
             combined_summary = f"{quality_summary}\n\nAdditional Statistics:\n{initial_info_str}"
+            
+            # Add tracking for required reports
+            await ctx.set("required_reports", [
+                "reports/data_quality_report.json",
+                "reports/cleaning_report.json", 
+                "reports/statistical_analysis_report.json",
+                "reports/regression_models.json",
+                "reports/advanced_models.json"
+            ])
             
             return InitialAssessmentEvent( 
                 stats_summary=combined_summary,
@@ -483,7 +505,7 @@ class DataAnalysisFlow(Workflow):
         )
 
     @step
-    async def create_visualizations(self, ctx: Context, ev: VisualizationRequestEvent) -> StopEvent:
+    async def create_visualizations(self, ctx: Context, ev: VisualizationRequestEvent) -> FinalizeReportsEvent:
         """Generates standard and advanced visualizations for the cleaned data using a dedicated agent.""" 
         print("--- Running Enhanced Visualization Step ---")
         df: pd.DataFrame = await ctx.get("dataframe")
@@ -492,17 +514,178 @@ class DataAnalysisFlow(Workflow):
 
         if df is None:
             print("Error: DataFrame not found in context for visualization.")
-            # Return previous report and error message
-            return StopEvent(result={"final_report": final_report, "visualization_info": "Error: DataFrame missing for visualization."})
+            # Return with error but continue to report finalization
+            return FinalizeReportsEvent(
+                final_report=final_report,
+                visualization_info="Error: DataFrame missing for visualization.",
+                plot_paths=[],
+                reports_to_verify=await ctx.get("required_reports", [])
+            )
 
         # Use the refactored visualization module
         visualization_results = await generate_visualizations(df, llm, modified_data_path)
         
-        # Include the enhanced report, confirmation, and all plot paths in the final result
+        # Get the list of required reports that need to be verified
+        required_reports = await ctx.get("required_reports", [
+            "reports/data_quality_report.json",
+            "reports/cleaning_report.json", 
+            "reports/statistical_analysis_report.json",
+            "reports/regression_models.json",
+            "reports/advanced_models.json"
+        ])
+        
+        # Continue to report finalization step
+        return FinalizeReportsEvent(
+            final_report=final_report,
+            visualization_info=visualization_results["visualization_info"],
+            plot_paths=visualization_results["plot_paths"],
+            reports_to_verify=required_reports
+        )
+
+    @step
+    async def finalize_reports(self, ctx: Context, ev: FinalizeReportsEvent) -> StopEvent:
+        """Verifies and finalizes all reports as the last step in the workflow."""
+        print("--- Running Report Finalization Step ---")
+        final_report = ev.final_report
+        visualization_info = ev.visualization_info
+        plot_paths = ev.plot_paths
+        reports_to_verify = ev.reports_to_verify
+        
+        # Verify reports and regenerate any missing or incomplete ones
+        reports_status = {}
+        
+        for report_path in reports_to_verify:
+            print(f"Verifying report: {report_path}")
+            status = {"exists": False, "complete": False, "error": None}
+            
+            try:
+                # Check if report exists
+                if os.path.exists(report_path):
+                    status["exists"] = True
+                    
+                    # Read report and check if it's a valid JSON
+                    with open(report_path, 'r') as f:
+                        try:
+                            report_data = json.load(f)
+                            
+                            # Check if the report has content
+                            if report_data and isinstance(report_data, dict):
+                                status["complete"] = True
+                            else:
+                                status["error"] = "Report exists but contains no valid data"
+                                print(f"Error: {report_path} exists but contains no valid data")
+                                
+                        except json.JSONDecodeError:
+                            status["error"] = "Invalid JSON format"
+                            print(f"Error: {report_path} is not a valid JSON file")
+                else:
+                    status["error"] = "Report file does not exist"
+                    print(f"Error: {report_path} does not exist")
+                    
+                # Store status for this report
+                reports_status[report_path] = status
+                
+                # If report is incomplete or missing, attempt to regenerate it
+                if not status["complete"]:
+                    await self._regenerate_report(ctx, report_path)
+            
+            except Exception as e:
+                status["error"] = str(e)
+                reports_status[report_path] = status
+                print(f"Error verifying report {report_path}: {e}")
+                
+                # Attempt to regenerate on error
+                await self._regenerate_report(ctx, report_path)
+        
+        # Update the final report with the status of all reports
+        report_status_summary = "\n\n## Reports Status\n\n"
+        for report_path, status in reports_status.items():
+            report_name = os.path.basename(report_path)
+            if status["complete"]:
+                report_status_summary += f"- ✅ {report_name}: Successfully generated\n"
+            else:
+                error = status["error"] or "Unknown error"
+                report_status_summary += f"- ⚠️ {report_name}: Issue detected - {error}\n"
+        
+        final_report_with_status = final_report + report_status_summary
+        
+        # Create a condensed final result
         final_result = {
-            "final_report": final_report,
-            "visualization_info": visualization_results["visualization_info"],
-            "plot_paths": visualization_results["plot_paths"]
+            "final_report": final_report_with_status,
+            "visualization_info": visualization_info,
+            "plot_paths": plot_paths,
+            "reports_status": reports_status
         }
         
+        print("Report finalization complete. Workflow finished.")
         return StopEvent(result=final_result)
+    
+    async def _regenerate_report(self, ctx: Context, report_path: str) -> None:
+        """Helper method to attempt regenerating a missing or incomplete report."""
+        print(f"Attempting to regenerate report: {report_path}")
+        
+        try:
+            df = await ctx.get("dataframe")
+            report_name = os.path.basename(report_path)
+            
+            if "data_quality_report" in report_path:
+                # Regenerate data quality report
+                print("Regenerating data quality report...")
+                assess_data_quality(df, save_report=True, report_path=report_path)
+                
+            elif "cleaning_report" in report_path:
+                # Regenerate cleaning report
+                print("Regenerating cleaning report...")
+                assessment_report = await ctx.get("assessment_report", None)
+                if assessment_report:
+                    clean_data(
+                        df=df,
+                        assessment_report=assessment_report,
+                        save_report=True,
+                        report_path=report_path,
+                        generate_plots=False  # Skip plots during regeneration
+                    )
+                
+            elif "regression_models" in report_path:
+                # Regenerate regression models report
+                print("Regenerating regression models report...")
+                regression_model = await ctx.get("regression_model")
+                if regression_model:
+                    regression_model.save_model_results(file_path=report_path)
+                else:
+                    # Try to rebuild the model if not in context
+                    perform_regression_analysis(
+                        df=df,
+                        target_column='Time',
+                        predictor_column='Distance',
+                        save_report=True,
+                        report_path=report_path,
+                        generate_plots=False  # Skip plots during regeneration
+                    )
+                    
+            elif "statistical_analysis_report" in report_path:
+                # Regenerate statistical analysis report
+                print("Regenerating statistical analysis report...")
+                generate_statistical_report(
+                    df=df,
+                    save_report=True,
+                    report_path=report_path
+                )
+                
+            elif "advanced_models" in report_path:
+                # Regenerate advanced models report
+                print("Regenerating advanced models report...")
+                perform_advanced_modeling(
+                    df=df,
+                    target_column='Time',
+                    predictor_column='Distance',
+                    save_report=True,
+                    report_path=report_path,
+                    generate_plots=False  # Skip plots during regeneration
+                )
+                
+            print(f"Successfully regenerated report: {report_path}")
+            
+        except Exception as e:
+            print(f"Failed to regenerate report {report_path}: {str(e)}")
+            traceback.print_exc()

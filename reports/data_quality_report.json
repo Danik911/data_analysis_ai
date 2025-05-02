@@ -1,6 +1,6 @@
 {
   "dataset_info": {
-    "total_rows": 281,
+    "total_rows": 279,
     "total_columns": 4,
     "column_names": [
       "Case",
@@ -8,17 +8,17 @@
       "Distance",
       "Time"
     ],
-    "quality_score": 94.48398576512456
+    "quality_score": 99.46236559139786
   },
   "issue_summary": {
-    "total_rows": 281,
+    "total_rows": 279,
     "total_columns": 4,
     "missing_value_count": 3,
     "duplicate_row_count": 0,
-    "outlier_count": 18,
-    "impossible_value_count": 2,
-    "duplicate_case_count": 2,
-    "invalid_mode_count": 6
+    "outlier_count": 0,
+    "impossible_value_count": 0,
+    "duplicate_case_count": 0,
+    "invalid_mode_count": 0
   },
   "type_verification": {
     "Case": {

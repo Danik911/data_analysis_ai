@@ -128,5 +128,5 @@ async def generate_visualizations(df: pd.DataFrame, llm, modified_data_path: str
     # Return the visualization results
     return {
         "visualization_info": viz_confirmation,
-        "plot_paths": all_plot_paths if all_plot_paths else "Plot paths not retrieved from tool calls."
+        "plot_paths": all_plot_paths  # Always return a list, even if empty
     }

@@ -441,6 +441,8 @@ class RegressionModel:
         Args:
             file_path: Path to save the JSON file
         """
+        print(f"[REGRESSION] Attempting to save model results to {file_path}")
+        
         # Make all values JSON serializable
         def make_serializable(item):
             if isinstance(item, np.ndarray):
@@ -449,29 +451,37 @@ class RegressionModel:
                 return float(item)
             elif isinstance(item, np.int64) or isinstance(item, np.int32):
                 return int(item)
-            elif isinstance(item, bool):  # Handle boolean values properly
-                return item  # Return as-is, native JSON boolean
+            elif isinstance(item, bool) or isinstance(item, np.bool_):  # Handle both Python and NumPy boolean types
+                return bool(item)  # Convert to Python native boolean
             else:
+                # Log unusual types that might cause serialization issues
+                if not isinstance(item, (str, int, float, list, dict, type(None))):
+                    print(f"[REGRESSION WARNING] Potentially non-serializable type encountered: {type(item)}")
                 return item
         
-        # Convert results to serializable format
-        serializable_results = {}
-        for key, result in self.model_results.items():
-            serializable_results[key] = {}
-            for k, v in result.items():
-                if isinstance(v, dict):
-                    serializable_results[key][k] = {k2: make_serializable(v2) for k2, v2 in v.items()}
-                else:
-                    serializable_results[key][k] = make_serializable(v)
-        
-        # Create directory if it doesn't exist
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-        # Write to file
-        with open(file_path, 'w') as f:
-            json.dump(serializable_results, f, indent=2)
-        
-        print(f"[REGRESSION] Model results saved to {file_path}")
+        try:
+            # Convert results to serializable format
+            serializable_results = {}
+            for key, result in self.model_results.items():
+                serializable_results[key] = {}
+                for k, v in result.items():
+                    if isinstance(v, dict):
+                        serializable_results[key][k] = {k2: make_serializable(v2) for k2, v2 in v.items()}
+                    else:
+                        serializable_results[key][k] = make_serializable(v)
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Write to file
+            with open(file_path, 'w') as f:
+                json.dump(serializable_results, f, indent=2)
+            
+            print(f"[REGRESSION] Model results successfully saved to {file_path}")
+        except Exception as e:
+            print(f"[REGRESSION ERROR] Failed to save model results to {file_path}: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
 
 
 def perform_regression_analysis(df: pd.DataFrame, 

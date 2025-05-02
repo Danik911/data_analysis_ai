@@ -12,4 +12,134 @@
       "intercept": 1.7013375745773724,
       "coefficient": 5.845856020109707,
       "p_value": 7.383147712865546e-36,
-      "is_significant": 
+      "is_significant": true
+    },
+    "confidence_intervals": {
+      "intercept_ci": [
+        -0.9347368966609984,
+        4.337412045815743
+      ],
+      "coefficient_ci": [
+        5.053857505418513,
+        6.637854534800901
+      ]
+    },
+    "formula": "Time = 1.70 + 5.85 * Distance"
+  },
+  "mode_Car": {
+    "model_type": "mode_Car",
+    "mode": "Car",
+    "sample_size": 82,
+    "metrics": {
+      "r": 0.9238380464435492,
+      "r_squared": 0.853476736056632,
+      "adjusted_r_squared": 0.8516451952573398,
+      "rmse": 2.2128569782578493,
+      "mae": 1.161940863349579
+    },
+    "coefficients": {
+      "intercept": 1.4348486856654024,
+      "coefficient": 3.6787301410502327,
+      "p_value": 4.1571987700371193e-35,
+      "is_significant": true
+    },
+    "confidence_intervals": {
+      "intercept_ci": [
+        0.18475461280653338,
+        2.6849427585242713
+      ],
+      "coefficient_ci": [
+        3.3395914788504126,
+        4.017868803250052
+      ]
+    },
+    "formula": "Time = 1.43 + 3.68 * Distance"
+  },
+  "mode_Bus": {
+    "model_type": "mode_Bus",
+    "mode": "Bus",
+    "sample_size": 76,
+    "metrics": {
+      "r": 0.987050555344147,
+      "r_squared": 0.9742687988051887,
+      "adjusted_r_squared": 0.9739210798701237,
+      "rmse": 2.0995130770213737,
+      "mae": 1.7334210648955706
+    },
+    "coefficients": {
+      "intercept": -2.3305311685564867,
+      "coefficient": 9.171843800524108,
+      "p_value": 1.440088178518512e-60,
+      "is_significant": true
+    },
+    "confidence_intervals": {
+      "intercept_ci": [
+        -3.5575975394199695,
+        -1.103464797693004
+      ],
+      "coefficient_ci": [
+        8.826589391358578,
+        9.517098209689639
+      ]
+    },
+    "formula": "Time = -2.33 + 9.17 * Distance"
+  },
+  "mode_Cycle": {
+    "model_type": "mode_Cycle",
+    "mode": "Cycle",
+    "sample_size": 70,
+    "metrics": {
+      "r": 0.9896593197417375,
+      "r_squared": 0.9794255691516789,
+      "adjusted_r_squared": 0.9791230039921448,
+      "rmse": 0.6507193084645635,
+      "mae": 0.49241912231128565
+    },
+    "coefficients": {
+      "intercept": 0.2563462314745371,
+      "coefficient": 3.7192203448474723,
+      "p_value": 4.381464149584827e-59,
+      "is_significant": true
+    },
+    "confidence_intervals": {
+      "intercept_ci": [
+        -0.12171979081322559,
+        0.6344122537622998
+      ],
+      "coefficient_ci": [
+        3.5887773926769904,
+        3.8496632970179543
+      ]
+    },
+    "formula": "Time = 0.26 + 3.72 * Distance"
+  },
+  "mode_Walk": {
+    "model_type": "mode_Walk",
+    "mode": "Walk",
+    "sample_size": 48,
+    "metrics": {
+      "r": 0.9229719791652886,
+      "r_squared": 0.8518772743242903,
+      "adjusted_r_squared": 0.8486572150704705,
+      "rmse": 6.146485020796256,
+      "mae": 3.8121275365693936
+    },
+    "coefficients": {
+      "intercept": 6.6877734609509165,
+      "coefficient": 8.99769692669021,
+      "p_value": 1.0610885769954654e-20,
+      "is_significant": true
+    },
+    "confidence_intervals": {
+      "intercept_ci": [
+        3.491899662831981,
+        9.883647259069852
+      ],
+      "coefficient_ci": [
+        7.884182043322194,
+        10.111211810058226
+      ]
+    },
+    "formula": "Time = 6.69 + 9.00 * Distance"
+  }
+}
