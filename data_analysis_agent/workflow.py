@@ -186,7 +186,7 @@ class DataAnalysisFlow(Workflow):
 
 
         return DataAnalysisEvent(
-            prepared_data_description=prepared_data_description, # Agent's initial suggestion
+            prepared_data_description=prepared_data_description, 
             original_path=ev.original_path
         )
 

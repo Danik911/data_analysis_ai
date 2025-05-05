@@ -29,31 +29,31 @@
   "mode_Car": {
     "model_type": "mode_Car",
     "mode": "Car",
-    "sample_size": 84,
+    "sample_size": 86,
     "metrics": {
-      "r": 0.9230057784989832,
-      "r_squared": 0.8519396671425139,
-      "adjusted_r_squared": 0.8501340533271787,
-      "rmse": 2.225005428130028,
-      "mae": 1.1857085829764302
+      "r": 0.9243133876649325,
+      "r_squared": 0.8543552386166235,
+      "adjusted_r_squared": 0.8526213724096786,
+      "rmse": 2.2009864918405007,
+      "mae": 1.1770678330348059
     },
     "coefficients": {
-      "intercept": 1.4719156475340154,
-      "coefficient": 3.6851878095487267,
-      "p_value": 9.238430513002328e-36,
+      "intercept": 1.5207013366566868,
+      "coefficient": 3.6740805913122343,
+      "p_value": 6.7641988378985205e-37,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        0.22304460145586114,
-        2.72078669361217
+        0.3052722632132361,
+        2.7361304101001376
       ],
       "coefficient_ci": [
-        3.3476892105610574,
-        4.022686408536396
+        3.3449359624900525,
+        4.003225220134416
       ]
     },
-    "formula": "Time = 1.47 + 3.69 * Distance"
+    "formula": "Time = 1.52 + 3.67 * Distance"
   },
   "mode_Bus": {
     "model_type": "mode_Bus",
@@ -87,31 +87,31 @@
   "mode_Cycle": {
     "model_type": "mode_Cycle",
     "mode": "Cycle",
-    "sample_size": 71,
+    "sample_size": 69,
     "metrics": {
-      "r": 0.9878734819958856,
-      "r_squared": 0.9758940164306743,
-      "adjusted_r_squared": 0.9755446543499594,
-      "rmse": 0.707796144775983,
-      "mae": 0.5158388304317664
+      "r": 0.9895081434079479,
+      "r_squared": 0.979126365870643,
+      "adjusted_r_squared": 0.9788148190925928,
+      "rmse": 0.6527123763400491,
+      "mae": 0.48608806719415987
     },
     "coefficients": {
-      "intercept": 0.3632165062255495,
-      "coefficient": 3.6662013062558505,
-      "p_value": 1.4770571002918317e-57,
+      "intercept": 0.3049796161181428,
+      "coefficient": 3.6702360331041235,
+      "p_value": 4.9918784969255254e-58,
       "is_significant": true
     },
     "confidence_intervals": {
       "intercept_ci": [
-        -0.0430781039290441,
-        0.7695111163801431
+        -0.07698841715593957,
+        0.6869476493922251
       ],
       "coefficient_ci": [
-        3.5278179434125483,
-        3.8045846690991527
+        3.5395591976769434,
+        3.8009128685313036
       ]
     },
-    "formula": "Time = 0.36 + 3.67 * Distance"
+    "formula": "Time = 0.30 + 3.67 * Distance"
   },
   "mode_Walk": {
     "model_type": "mode_Walk",

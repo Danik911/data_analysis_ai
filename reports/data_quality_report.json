@@ -172,13 +172,13 @@
     },
     "Mode": {
       "valid_values": [
-        "Bus",
-        "Cycle",
-        "Subway",
-        "Car",
-        "Tram",
         "Train",
-        "Walk"
+        "Walk",
+        "Bus",
+        "Car",
+        "Subway",
+        "Cycle",
+        "Tram"
       ],
       "invalid_values": [
         "Wilk",
@@ -198,9 +198,9 @@
       ],
       "likely_corrections": {
         "Wilk": "Walk",
-        "Cur": "Cycle",
+        "Cur": "Car",
         "Bas": "Bus",
-        "Cra": "Cycle",
+        "Cra": "Car",
         "Walt": "Walk"
       }
     }

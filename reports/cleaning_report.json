@@ -6,9 +6,9 @@
         "changes": 6,
         "value_map": {
           "Wilk": "Walk",
-          "Cur": "Cycle",
+          "Cur": "Car",
           "Bas": "Bus",
-          "Cra": "Cycle",
+          "Cra": "Car",
           "Walt": "Walk"
         }
       }
@@ -123,5 +123,5 @@
   },
   "original_rows": 281,
   "cleaned_rows": 281,
-  "timestamp": "2025-05-02T11:29:05.408965"
+  "timestamp": "2025-05-03T05:47:24.221307"
 }
